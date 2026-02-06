@@ -94,6 +94,7 @@ code {
     background-color: transparent !important;
     filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.3));
     transition: var(--transition);
+    mix-blend-mode: lighten;
 }
 
 .navbar-logo:hover {
@@ -291,12 +292,13 @@ code {
 }
 
 .hero-logo {
-    height: 140px;
+    height: 200px;
     width: auto;
     object-fit: contain;
     margin-bottom: 2rem;
-    filter: drop-shadow(0 10px 30px rgba(0, 212, 255, 0.4));
+    filter: drop-shadow(0 10px 30px rgba(0, 212, 255, 0.4)) drop-shadow(0 0 20px rgba(0, 212, 255, 0.2));
     animation: pulse 2s ease-in-out infinite;
+    mix-blend-mode: lighten;
 }
 
 @keyframes pulse {
