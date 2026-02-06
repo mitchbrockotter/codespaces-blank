@@ -10,7 +10,12 @@ function isAuthenticated(req, res, next) {
   if (req.session && req.session.userId) {
     next();
   } else {
-    res.redirect('/login');
+    // Check if this is an API request
+    if (req.path.startsWith('/api/')) {
+      res.status(401).json({ error: 'Not authenticated' });
+    } else {
+      res.redirect('/login');
+    }
   }
 }
 
