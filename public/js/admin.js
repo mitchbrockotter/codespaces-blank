@@ -846,3 +846,10 @@ function setupEnvironmentSearch() {
         displayEnvironments(filtered);
     });
 }
+
+// ============= EXPOSE FUNCTIONS TO GLOBAL SCOPE =============
+// These functions are called from inline onclick handlers in dynamically generated HTML
+window.editEnvironment = editEnvironment;
+window.runProject = runProject;
+window.deleteProject = deleteProject;
+window.openEditUserModal = openEditUserModal;
