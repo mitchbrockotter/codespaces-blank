@@ -60,23 +60,14 @@ if (loginBtn) {
 
             // Successful login
             console.log('✅ Login successful:', data.user);
-            console.log('Redirecting to:', data.redirect);
             
             // Store user info in localStorage for persistent session
             localStorage.setItem('user', JSON.stringify(data.user));
             localStorage.setItem('redirectPath', data.redirect);
             console.log('💾 User stored in localStorage');
-            console.log('⏳ Redirecting in 5 seconds...');
             
-            // Show success message
-            errorDiv.textContent = '✅ Login successful! Redirecting...';
-            errorDiv.style.color = '#00d4ff';
-            errorDiv.style.display = 'block';
-            
-            // Redirect based on user role (delayed so console is visible)
-            setTimeout(() => {
-                window.location.href = data.redirect;
-            }, 5000);
+            // Redirect immediately
+            window.location.href = data.redirect;
 
         } catch (error) {
             console.error('Login error:', error);

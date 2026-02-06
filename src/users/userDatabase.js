@@ -66,10 +66,10 @@ function findByUsername(username) {
 }
 
 /**
- * Find user by email
+ * Find user by email (case-insensitive)
  */
 function findByEmail(email) {
-  return users.find(u => u.email === email);
+  return users.find(u => u.email.toLowerCase() === email.toLowerCase());
 }
 
 /**
@@ -87,13 +87,14 @@ function verifyPassword(plainPassword, hashedPassword) {
 }
 
 /**
- * Authenticate user - accepts username or email
+ * Authenticate user - accepts username or email (email is case-insensitive)
  */
 function authenticateUser(usernameOrEmail, password) {
-  // Try to find by username first, then by email
+  // Try to find by username first
   let user = findByUsername(usernameOrEmail);
+  // Then try by email (case-insensitive)
   if (!user) {
-    user = findByEmail(usernameOrEmail);
+    user = users.find(u => u.email.toLowerCase() === usernameOrEmail.toLowerCase());
   }
   
   if (!user) {
