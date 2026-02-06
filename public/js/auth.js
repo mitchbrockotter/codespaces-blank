@@ -3,7 +3,9 @@
  */
 
 // Use runtime API base from `public/env.js` (window.API_BASE)
-const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+if (typeof API_BASE === 'undefined') {
+    var API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+}
 function apiPath(path){ return API_BASE + path; }
 
 // Handle login form submission

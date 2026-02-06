@@ -2,7 +2,9 @@
  * Dashboard page functionality
  */
 // Use runtime API base from `public/env.js`
-const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+if (typeof API_BASE === 'undefined') {
+    var API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+}
 function apiPath(path){ return API_BASE + path; }
 
 document.addEventListener('DOMContentLoaded', async () => {
