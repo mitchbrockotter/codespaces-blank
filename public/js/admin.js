@@ -12,15 +12,7 @@ let allActivities = [];
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Admin page DOMContentLoaded');
     
-    const user = await getCurrentUser();
-    console.log('Current user:', user);
-    
-    if (user && user.role !== 'admin') {
-        window.location.href = '/dashboard';
-        return;
-    }
-
-    // Setup modals first (they don't require data)
+    // Setup modals first (they don't require authentication)
     setupAddUserModal();
     setupEditUserModal();
     setupEnvironmentModals();
@@ -29,7 +21,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupUserSearch();
     setupEnvironmentSearch();
     
-    // Load all necessary data
+    // Now check authentication
+    const user = await getCurrentUser();
+    console.log('Current user:', user);
+    
+    if (!user) {
+        console.log('No user found, redirecting to login...');
+        window.location.href = '/login';
+        return;
+    }
+    
+    if (user.role !== 'admin') {
+        console.log('User is not admin, redirecting to dashboard...');
+        window.location.href = '/dashboard';
+        return;
+    }
+    
+    // Load all necessary data (only if authenticated as admin)
     await loadUsers();
     await loadStats();
     await loadActivityLog();
@@ -135,26 +143,44 @@ function setupAddUserModal() {
     
     const modal = document.getElementById('addUserModal');
     const addBtn = document.getElementById('addUserBtn');
-    const closeBtn = modal ? modal.querySelector('.close') : null;
+    
+    console.log('Checking elements:', { 
+        modal: modal, 
+        addBtn: addBtn,
+        modalId: modal?.id,
+        buttonId: addBtn?.id 
+    });
+
+    if (!modal) {
+        console.error('addUserModal not found in DOM');
+        return;
+    }
+    
+    if (!addBtn) {
+        console.error('addUserBtn not found in DOM');
+        return;
+    }
+    
+    const closeBtn = modal.querySelector('.close');
     const form = document.getElementById('addUserForm');
 
     console.log('Modal elements:', { modal: !!modal, addBtn: !!addBtn, closeBtn: !!closeBtn, form: !!form });
 
-    if (!modal || !addBtn || !closeBtn || !form) {
-        console.error('Add user modal elements not found');
-        console.error('Missing elements:', {
-            modal: !modal,
-            addBtn: !addBtn,
-            closeBtn: !closeBtn,
-            form: !form
-        });
+    if (!closeBtn || !form) {
+        console.error('Close button or form not found');
         return;
     }
 
     console.log('Adding click listener to addUserBtn');
-    addBtn.addEventListener('click', (e) => {
+    
+    // Remove any existing listeners (in case this is called multiple times)
+    const newAddBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+    
+    newAddBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        console.log('Add User button clicked!');
+        e.stopPropagation();
+        console.log('=== Add User button clicked! ===');
         modal.style.display = 'flex';
     });
 
@@ -208,10 +234,12 @@ function setupAddUserModal() {
                 alert(message);
                 form.reset();
                 modal.style.display = 'none';
-                await loadUsers();
-                await loadStats();
-                await loadActivityLog();
-                await loadEnvironments(); // Refresh environments list
+                
+                // Reload data if functions exist
+                if (typeof loadUsers === 'function') await loadUsers();
+                if (typeof loadStats === 'function') await loadStats();
+                if (typeof loadActivityLog === 'function') await loadActivityLog();
+                if (typeof loadEnvironments === 'function') await loadEnvironments();
             } else {
                 const error = await response.json();
                 alert('Fout: ' + error.error);
@@ -221,6 +249,8 @@ function setupAddUserModal() {
             alert('Er is een fout opgetreden bij het aanmaken van de gebruiker');
         }
     });
+    
+    console.log('Add user modal setup complete');
 }
 
 /**

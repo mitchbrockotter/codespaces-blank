@@ -78,7 +78,20 @@ async function getCurrentUser() {
             credentials: 'include'
         });
         if (response.ok) {
-            return await response.json();
+            const data = await response.json();
+            return data;
+        }
+        // If not OK, check if it's JSON or HTML
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                const errorData = await response.json();
+                console.log('API error:', errorData);
+            } catch (e) {
+                console.log('Could not parse error response as JSON');
+            }
+        } else {
+            console.log('Received non-JSON response, status:', response.status);
         }
         return null;
     } catch (error) {
