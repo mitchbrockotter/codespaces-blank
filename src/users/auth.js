@@ -15,9 +15,13 @@ function isAuthenticated(req, res, next) {
   
   // Check custom headers (from localStorage frontend auth)
   const userId = req.headers['x-user-id'];
+  const role = req.headers['x-user-role'];
   if (userId) {
     req.session = req.session || {};
     req.session.userId = parseInt(userId);
+    if (role) {
+      req.session.role = role;
+    }
     return next();
   }
   
