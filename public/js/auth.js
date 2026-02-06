@@ -73,9 +73,6 @@ if (loginForm) {
 } else {
     console.error('❌ loginForm not found in DOM');
 }
-        }
-    });
-}
 
 // Logout functionality
 const logoutBtn = document.getElementById('logoutBtn');
