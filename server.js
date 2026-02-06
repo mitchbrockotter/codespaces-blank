@@ -15,10 +15,50 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // CORS - Allow frontend to connect from different domain
+const allowedOrigins = [
+  'https://pkba.nl',
+  'https://www.pkba.nl',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+// Allow any Vercel deployment
+if (process.env.VERCEL_URL) {
+  allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+}
+allowedOrigins.push(/\.vercel\.app$/); // Allow all Vercel preview URLs
+
 app.use(cors({
-  origin: ['https://pkba.nl', 'https://www.pkba.nl', 'https://codespaces-blank-virid.vercel.app'],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400
 }));
+
+// Debug middleware for CORS and requests
+app.use((req, res, next) => {
+  console.log('--- REQUEST ---');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Origin header:', req.headers.origin);
+  console.log('Cookie header:', req.headers.cookie);
+  
+  // Override res.json to log response headers
+  const originalJson = res.json;
+  res.json = function(data) {
+    console.log('--- RESPONSE ---');
+    console.log('Status:', res.statusCode);
+    console.log('Set-Cookie header:', res.getHeader('set-cookie'));
+    console.log('Access-Control-Allow-Credentials:', res.getHeader('access-control-allow-credentials'));
+    console.log('Data:', data);
+    return originalJson.call(this, data);
+  };
+  
+  next();
+});
 
 // Middleware
 app.use(express.static('public'));
@@ -130,16 +170,25 @@ app.post('/api/login', (req, res) => {
 
   console.log('Login successful, redirecting to:', redirectPath);
 
-  res.json({
-    success: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      company: user.company,
-      role: user.role,
-      environment: user.environment
-    },
-    redirect: redirectPath
+  // Explicitly save session before responding
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.status(500).json({ error: 'Session save failed' });
+    }
+
+    console.log('Session saved, sending response');
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        company: user.company,
+        role: user.role,
+        environment: user.environment
+      },
+      redirect: redirectPath
+    });
   });
 });
 
