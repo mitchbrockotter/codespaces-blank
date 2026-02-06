@@ -9,10 +9,16 @@ if (typeof API_BASE === 'undefined') {
 function apiPath(path){ return API_BASE + path; }
 
 // Handle login form submission
+console.log('🔍 Looking for loginForm...');
 const loginForm = document.getElementById('loginForm');
+console.log('loginForm found:', !!loginForm);
+
 if (loginForm) {
+    console.log('✅ Attaching login event listener');
     loginForm.addEventListener('submit', async (e) => {
+        console.log('🎯 Login form submit event fired');
         e.preventDefault();
+        e.stopImmediatePropagation();
 
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
@@ -62,6 +68,11 @@ if (loginForm) {
             console.error('Error type:', error.name);
             errorDiv.textContent = 'An error occurred. Please try again.';
             errorDiv.style.display = 'block';
+        }
+    });
+} else {
+    console.error('❌ loginForm not found in DOM');
+}
         }
     });
 }
