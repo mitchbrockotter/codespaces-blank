@@ -29,12 +29,66 @@ body {
     background: linear-gradient(135deg, var(--dark-bg) 0%, #1a2635 100%);
     background-attachment: fixed;
     min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Tech-achtergrond met animatie */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        linear-gradient(0deg, transparent 24%, rgba(0, 212, 255, 0.05) 25%, rgba(0, 212, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 212, 255, 0.05) 75%, rgba(0, 212, 255, 0.05) 76%, transparent 77%, transparent),
+        linear-gradient(90deg, transparent 24%, rgba(0, 212, 255, 0.05) 25%, rgba(0, 212, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(0, 212, 255, 0.05) 75%, rgba(0, 212, 255, 0.05) 76%, transparent 77%, transparent);
+    background-size: 80px 80px;
+    background-attachment: fixed;
+    animation: techGrid 20s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    animation: techPulse 8s ease-in-out infinite;
+}
+
+@keyframes techGrid {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 80px 80px;
+    }
+}
+
+@keyframes techPulse {
+    0%, 100% {
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 1.2;
+    }
 }
 
 a {
     color: var(--primary-color);
     text-decoration: none;
     transition: var(--transition);
+    position: relative;
+    z-index: 1;
 }
 
 a:hover {
@@ -233,7 +287,7 @@ code {
 
 /* ===== Hero Section ===== */
 .hero {
-    background: linear-gradient(135deg, #0f1419 0%, var(--secondary-color) 50%, var(--primary-dark) 100%);
+    background: linear-gradient(135deg, rgba(15, 20, 25, 0.9) 0%, rgba(26, 42, 74, 0.9) 50%, rgba(0, 99, 180, 0.8) 100%);
     position: relative;
     color: white;
     padding: 8rem 2rem;
@@ -243,6 +297,7 @@ code {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    z-index: 2;
 }
 
 .hero::before {
