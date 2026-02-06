@@ -21,13 +21,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadUsers();
     await loadStats();
     await loadActivityLog();
+    await loadEnvironments();
 
     // Setup modals
     setupAddUserModal();
     setupEditUserModal();
+    setupEnvironmentModals();
     
     // Setup search
     setupUserSearch();
+    setupEnvironmentSearch();
 });
 
 /**
@@ -127,10 +130,16 @@ async function openEditUserModal(userId) {
 function setupAddUserModal() {
     const modal = document.getElementById('addUserModal');
     const addBtn = document.getElementById('addUserBtn');
-    const closeBtn = modal.querySelector('.close');
+    const closeBtn = modal ? modal.querySelector('.close') : null;
     const form = document.getElementById('addUserForm');
 
+    if (!modal || !addBtn || !closeBtn || !form) {
+        console.error('Add user modal elements not found');
+        return;
+    }
+
     addBtn.addEventListener('click', () => {
+        console.log('Add User button clicked');
         modal.style.display = 'flex';
     });
 
@@ -190,7 +199,7 @@ function setupAddUserModal() {
             }
         } catch (error) {
             console.error('Error creating user:', error);
-            alert('An error occurred while creating the user');
+            alert('Er is een fout opgetreden bij het aanmaken van de gebruiker');
         }
     });
 }
@@ -356,15 +365,6 @@ function displayActivityLog() {
 let allEnvironments = [];
 
 /**
- * Load environments on page load
- */
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadEnvironments();
-    setupEnvironmentModals();
-    setupEnvironmentSearch();
-});
-
-/**
  * Load and display all environments
  */
 async function loadEnvironments() {
@@ -431,8 +431,16 @@ function setupEnvironmentModals() {
     const editEnvForm = document.getElementById('editEnvForm');
     const deleteEnvBtn = document.getElementById('deleteEnvBtn');
 
-    // Only setup if elements exist
-    if (!addEnvModal || !editEnvModal) return;
+    // Only setup if all required elements exist
+    if (!addEnvModal || !addEnvBtn || !addEnvClose || !addEnvForm) {
+        console.log('Add environment modal elements not found');
+        return;
+    }
+    
+    if (!editEnvModal || !editEnvClose || !editEnvForm || !deleteEnvBtn) {
+        console.log('Edit environment modal elements not found');
+        return;
+    }
 
     // Add environment modal
     addEnvBtn.addEventListener('click', () => {
