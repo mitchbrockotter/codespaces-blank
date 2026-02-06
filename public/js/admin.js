@@ -35,7 +35,9 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function loadUsers() {
     try {
-        const response = await fetch(apiPath('/api/users'));
+        const response = await fetch(apiPath('/api/users'), {
+            credentials: 'include'
+        });
         if (response.ok) {
             allUsers = await response.json();
             displayUsers(allUsers);
@@ -159,6 +161,7 @@ function setupAddUserModal() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify(newUser)
             });
 
@@ -218,6 +221,7 @@ function setupEditUserModal() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify(updatedUser)
             });
 
@@ -247,7 +251,8 @@ function setupEditUserModal() {
 
         try {
             const response = await fetch(apiPath(`/api/users/${userId}`), {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             });
 
             if (response.ok) {
@@ -272,7 +277,9 @@ function setupEditUserModal() {
  */
 async function loadStats() {
     try {
-        const response = await fetch(apiPath('/api/stats'));
+        const response = await fetch(apiPath('/api/stats'), {
+            credentials: 'include'
+        });
         if (response.ok) {
             const stats = await response.json();
             
@@ -291,7 +298,9 @@ async function loadStats() {
  */
 async function loadActivityLog() {
     try {
-        const response = await fetch(apiPath('/api/activities?limit=20'));
+        const response = await fetch(apiPath('/api/activities?limit=20'), {
+            credentials: 'include'
+        });
         if (response.ok) {
             const data = await response.json();
             allActivities = data.activities;

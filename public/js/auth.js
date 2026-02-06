@@ -22,6 +22,7 @@ if (loginForm) {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify({ username, password })
             });
 
@@ -55,7 +56,8 @@ if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
         try {
             const response = await fetch(apiPath('/api/logout'), {
-                method: 'POST'
+                method: 'POST',
+                credentials: 'include'
             });
 
             if (response.ok) {
@@ -72,7 +74,9 @@ if (logoutBtn) {
  */
 async function getCurrentUser() {
     try {
-        const response = await fetch(apiPath('/api/user'));
+        const response = await fetch(apiPath('/api/user'), {
+            credentials: 'include'
+        });
         if (response.ok) {
             return await response.json();
         }

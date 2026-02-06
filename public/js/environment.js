@@ -18,7 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function loadEnvironmentDetails() {
     try {
-        const response = await fetch(apiPath('/api/environment'));
+        const response = await fetch(apiPath('/api/environment'), {
+            credentials: 'include'
+        });
         if (response.ok) {
             const env = await response.json();
             displayEnvironmentDetails(env);

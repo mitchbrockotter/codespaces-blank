@@ -5,12 +5,19 @@
 
 const express = require('express');
 const session = require('express-session');
+const cors = require('cors');
 const path = require('path');
 const userDb = require('./src/users/userDatabase');
 const auth = require('./src/users/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// CORS - Allow frontend to connect from different domain
+app.use(cors({
+  origin: ['https://pkba.nl', 'https://www.pkba.nl', 'https://codespaces-blank-virid.vercel.app'],
+  credentials: true
+}));
 
 // Middleware
 app.use(express.static('public'));
@@ -23,9 +30,10 @@ app.use(session({
   resave: false,
   saveUninitialized: true,
   cookie: { 
-    secure: false, // Set to true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production', // Use HTTPS cookies in production
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Required for cross-domain cookies
   }
 }));
 
