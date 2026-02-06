@@ -8,6 +8,40 @@ if (typeof API_BASE === 'undefined') {
 }
 function apiPath(path){ return API_BASE + path; }
 
+/**
+ * Helper function to add auth headers from localStorage to API requests
+ */
+function getAuthHeaders() {
+    const userJson = localStorage.getItem('user');
+    const headers = {};
+    if (userJson) {
+        try {
+            const user = JSON.parse(userJson);
+            headers['X-User-Id'] = user.id;
+            headers['X-User-Role'] = user.role;
+        } catch (e) {
+            console.error('Error parsing user from localStorage:', e);
+        }
+    }
+    return headers;
+}
+
+/**
+ * Wrapper for fetch that automatically adds auth headers
+ */
+async function apiCall(path, options = {}) {
+    const headers = {
+        ...getAuthHeaders(),
+        ...options.headers
+    };
+    
+    return fetch(apiPath(path), {
+        ...options,
+        credentials: 'include',
+        headers
+    });
+}
+
 let allUsers = [];
 let allActivities = [];
 
@@ -51,9 +85,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 async function loadUsers() {
     try {
-        const response = await fetch(apiPath('/api/users'), {
-            credentials: 'include'
-        });
+        const response = await apiCall('/api/users');
         console.log('GET /api/users response:', response.status);
         if (response.ok) {
             allUsers = await response.json();
@@ -204,12 +236,11 @@ function setupAddUserModal() {
         console.log('Creating user:', newUser);
 
         try {
-            const response = await fetch(apiPath('/api/users'), {
+            const response = await apiCall('/api/users', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include',
                 body: JSON.stringify(newUser)
             });
 
@@ -280,12 +311,11 @@ function setupEditUserModal() {
         };
 
         try {
-            const response = await fetch(apiPath(`/api/users/${userId}`), {
+            const response = await apiCall(`/api/users/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include',
                 body: JSON.stringify(updatedUser)
             });
 
@@ -314,9 +344,8 @@ function setupEditUserModal() {
         }
 
         try {
-            const response = await fetch(apiPath(`/api/users/${userId}`), {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await apiCall(`/api/users/${userId}`, {
+                method: 'DELETE'
             });
 
             if (response.ok) {
@@ -341,9 +370,7 @@ function setupEditUserModal() {
  */
 async function loadStats() {
     try {
-        const response = await fetch(apiPath('/api/stats'), {
-            credentials: 'include'
-        });
+        const response = await apiCall('/api/stats');
         if (response.ok) {
             const stats = await response.json();
             
@@ -362,9 +389,7 @@ async function loadStats() {
  */
 async function loadActivityLog() {
     try {
-        const response = await fetch(apiPath('/api/activities?limit=20'), {
-            credentials: 'include'
-        });
+        const response = await apiCall('/api/activities?limit=20');
         if (response.ok) {
             const data = await response.json();
             allActivities = data.activities;
@@ -412,9 +437,7 @@ let allEnvironments = [];
  */
 async function loadEnvironments() {
     try {
-        const response = await fetch(apiPath('/api/environments'), {
-            credentials: 'include'
-        });
+        const response = await apiCall('/api/environments');
         if (response.ok) {
             allEnvironments = await response.json();
             displayEnvironments(allEnvironments);
@@ -506,12 +529,11 @@ function setupEnvironmentModals() {
         };
 
         try {
-            const response = await fetch(apiPath('/api/environments'), {
+            const response = await apiCall('/api/environments', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include',
                 body: JSON.stringify(newEnv)
             });
 
@@ -547,12 +569,11 @@ function setupEnvironmentModals() {
         };
 
         try {
-            const response = await fetch(apiPath(`/api/environments/${envId}`), {
+            const response = await apiCall(`/api/environments/${envId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                credentials: 'include',
                 body: JSON.stringify(updatedEnv)
             });
 
@@ -580,9 +601,8 @@ function setupEnvironmentModals() {
         }
 
         try {
-            const response = await fetch(apiPath(`/api/environments/${envId}`), {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await apiCall(`/api/environments/${envId}`, {
+                method: 'DELETE'
             });
 
             if (response.ok) {
@@ -631,9 +651,7 @@ function populateUserDropdown() {
  */
 async function editEnvironment(envId) {
     try {
-        const response = await fetch(apiPath(`/api/environments/${envId}`), {
-            credentials: 'include'
-        });
+        const response = await apiCall(`/api/environments/${envId}`);
         
         if (response.ok) {
             const env = await response.json();

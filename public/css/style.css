@@ -1127,6 +1127,8 @@ code {
     border-radius: 12px;
     max-width: 600px;
     width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 212, 255, 0.3);
     border: 1px solid var(--border-color);
 }
