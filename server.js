@@ -38,25 +38,9 @@ app.use(cors({
   maxAge: 86400
 }));
 
-// Debug middleware for CORS and requests
+// Simple request logging (don't modify res.json)
 app.use((req, res, next) => {
-  console.log('--- REQUEST ---');
-  console.log('Method:', req.method);
-  console.log('URL:', req.url);
-  console.log('Origin header:', req.headers.origin);
-  console.log('Cookie header:', req.headers.cookie);
-  
-  // Override res.json to log response headers
-  const originalJson = res.json;
-  res.json = function(data) {
-    console.log('--- RESPONSE ---');
-    console.log('Status:', res.statusCode);
-    console.log('Set-Cookie header:', res.getHeader('set-cookie'));
-    console.log('Access-Control-Allow-Credentials:', res.getHeader('access-control-allow-credentials'));
-    console.log('Data:', data);
-    return originalJson.call(this, data);
-  };
-  
+  console.log(`${req.method} ${req.url}`);
   next();
 });
 
@@ -69,14 +53,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: 'pk-backend-automation-secret-key-2026',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true, // Changed to true to ensure cookie is always sent
   cookie: { 
     secure: process.env.NODE_ENV === 'production', // Use HTTPS cookies in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Required for cross-domain cookies
-    path: '/',
-    domain: process.env.NODE_ENV === 'production' ? undefined : 'localhost'
+    path: '/'
   }
 }));
 
@@ -163,32 +146,24 @@ app.post('/api/login', (req, res) => {
   req.session.role = user.role;
   req.session.environment = user.environment;
 
-  console.log('Session created:', req.session);
+  console.log('Session set, userId:', req.session.userId);
 
   // Get redirect path from user settings
   const redirectPath = userDb.getUserRedirectPath(user.id);
 
   console.log('Login successful, redirecting to:', redirectPath);
 
-  // Explicitly save session before responding
-  req.session.save((err) => {
-    if (err) {
-      console.error('Session save error:', err);
-      return res.status(500).json({ error: 'Session save failed' });
-    }
-
-    console.log('Session saved, sending response');
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        company: user.company,
-        role: user.role,
-        environment: user.environment
-      },
-      redirect: redirectPath
-    });
+  // Let Express handle session cookie automatically
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      company: user.company,
+      role: user.role,
+      environment: user.environment
+    },
+    redirect: redirectPath
   });
 });
 
@@ -210,10 +185,6 @@ app.post('/api/logout', (req, res) => {
  * GET /api/user
  */
 app.get('/api/user', auth.isAuthenticated, (req, res) => {
-  console.log('=== GET /api/user ===');
-  console.log('Session:', req.session);
-  console.log('User ID in session:', req.session.userId);
-  
   res.json({
     id: req.session.userId,
     username: req.session.username,
