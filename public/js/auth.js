@@ -61,11 +61,17 @@ if (loginBtn) {
             // Successful login
             console.log('✅ Login successful:', data.user);
             console.log('Redirecting to:', data.redirect);
+            console.log('⏳ Redirecting in 5 seconds...');
             
-            // Redirect based on user role
+            // Show success message
+            errorDiv.textContent = '✅ Login successful! Redirecting...';
+            errorDiv.style.color = '#00d4ff';
+            errorDiv.style.display = 'block';
+            
+            // Redirect based on user role (delayed so console is visible)
             setTimeout(() => {
                 window.location.href = data.redirect;
-            }, 500);
+            }, 5000);
 
         } catch (error) {
             console.error('Login error:', error);
