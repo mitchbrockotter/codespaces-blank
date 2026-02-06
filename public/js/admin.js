@@ -144,13 +144,6 @@ function setupAddUserModal() {
     const modal = document.getElementById('addUserModal');
     const addBtn = document.getElementById('addUserBtn');
     
-    console.log('Checking elements:', { 
-        modal: modal, 
-        addBtn: addBtn,
-        modalId: modal?.id,
-        buttonId: addBtn?.id 
-    });
-
     if (!modal) {
         console.error('addUserModal not found in DOM');
         return;
@@ -164,25 +157,16 @@ function setupAddUserModal() {
     const closeBtn = modal.querySelector('.close');
     const form = document.getElementById('addUserForm');
 
-    console.log('Modal elements:', { modal: !!modal, addBtn: !!addBtn, closeBtn: !!closeBtn, form: !!form });
-
     if (!closeBtn || !form) {
         console.error('Close button or form not found');
         return;
     }
 
-    console.log('Adding click listener to addUserBtn');
-    
-    // Remove any existing listeners (in case this is called multiple times)
-    const newAddBtn = addBtn.cloneNode(true);
-    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
-    
-    newAddBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    // Simple direct click handler - no cloning
+    addBtn.onclick = function(e) {
         console.log('=== Add User button clicked! ===');
         modal.style.display = 'flex';
-    });
+    };
 
     closeBtn.addEventListener('click', () => {
         console.log('Close button clicked');
