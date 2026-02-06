@@ -260,9 +260,9 @@ code {
     background: transparent;
     position: relative;
     color: white;
-    padding: 2rem 2rem;
+    padding: 1rem 2rem;
     text-align: center;
-    min-height: 600px;
+    min-height: 520px;
     display: flex;
     align-items: flex-start;
     justify-content: center;
@@ -318,7 +318,7 @@ code {
 }
 
 .hero-logo {
-    height: 560px;
+    height: 480px;
     width: auto;
     object-fit: contain;
     margin-bottom: 1rem;
@@ -1218,6 +1218,10 @@ code {
         height: 30px;
     }
 
+    .hero-logo {
+        height: 280px;
+    }
+
     .navbar-right {
         width: auto;
         justify-content: flex-end;
@@ -1430,6 +1434,10 @@ code {
     .hero {
         padding: 1.5rem 0.5rem;
         min-height: 250px;
+    }
+
+    .hero-logo {
+        height: 180px;
     }
 
     .login-box {
