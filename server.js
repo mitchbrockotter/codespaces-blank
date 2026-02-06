@@ -52,15 +52,16 @@ app.use(express.urlencoded({ extended: true }));
 // Session configuration
 app.use(session({
   secret: 'pk-backend-automation-secret-key-2026',
-  resave: false,
-  saveUninitialized: true, // Changed to true to ensure cookie is always sent
+  resave: true, // Force save to ensure cookie is always set
+  saveUninitialized: true,
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // Use HTTPS cookies in production
-    httpOnly: true,
+    secure: true, // Always use HTTPS (Railway auto-redirects)
+    httpOnly: true, // Prevent JavaScript access
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Required for cross-domain cookies
+    sameSite: 'none', // Allow cross-domain cookies
     path: '/'
-  }
+  },
+  name: 'sessionId' // Custom session cookie name
 }));
 
 // Middleware to attach user info to request
