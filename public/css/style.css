@@ -292,13 +292,13 @@ code {
 }
 
 .hero-logo {
-    height: 200px;
+    height: 280px;
     width: auto;
     object-fit: contain;
     margin-bottom: 2rem;
-    filter: drop-shadow(0 10px 30px rgba(0, 212, 255, 0.4)) drop-shadow(0 0 20px rgba(0, 212, 255, 0.2));
+    filter: drop-shadow(0 15px 40px rgba(0, 212, 255, 0.5)) brightness(1.1) contrast(1.2);
     animation: pulse 2s ease-in-out infinite;
-    mix-blend-mode: lighten;
+    mix-blend-mode: screen;
 }
 
 @keyframes pulse {
