@@ -720,7 +720,7 @@ code {
 }
 
 .sidebar {
-    background-color: #f8f9fa;
+    background: linear-gradient(180deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.5) 100%);
     border-right: 1px solid var(--border-color);
     padding: 2rem 0;
 }
@@ -738,12 +738,12 @@ code {
 }
 
 .menu-item:hover {
-    background-color: #e9ecef;
+    background: rgba(0, 212, 255, 0.1);
     border-left-color: var(--primary-color);
 }
 
 .menu-item.active {
-    background-color: #e7f3ff;
+    background: rgba(0, 212, 255, 0.15);
     border-left-color: var(--primary-color);
     color: var(--primary-color);
     font-weight: 500;
@@ -752,6 +752,7 @@ code {
 .dashboard-content {
     padding: 2rem;
     overflow-y: auto;
+    background: transparent;
 }
 
 .content-header {
@@ -775,16 +776,18 @@ code {
 }
 
 .dashboard-card {
-    background: white;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.5) 100%);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     transition: var(--transition);
 }
 
 .dashboard-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 25px rgba(0, 212, 255, 0.2);
+    border-color: var(--primary-color);
+    transform: translateY(-5px);
 }
 
 .dashboard-card h3 {
@@ -825,11 +828,11 @@ code {
 }
 
 .alert-box {
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
-    border-radius: 4px;
+    background: linear-gradient(135deg, rgba(0, 208, 132, 0.15) 0%, rgba(0, 208, 132, 0.05) 100%);
+    border: 1px solid var(--success-color);
+    border-radius: 8px;
     padding: 1rem;
-    color: #155724;
+    color: var(--success-color);
 }
 
 .alert-box p {
@@ -843,9 +846,9 @@ code {
 
 /* ===== Info Sections ===== */
 .info-section {
-    background: white;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.5) 100%);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 2rem;
     margin-top: 2rem;
 }
@@ -891,7 +894,7 @@ code {
 .metric-bar {
     flex: 1;
     height: 20px;
-    background-color: #e9ecef;
+    background-color: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
     overflow: hidden;
 }
@@ -931,9 +934,9 @@ code {
 
 /* ===== Admin Panel ===== */
 .admin-section {
-    background: white;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.5) 100%);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 2rem;
     margin-bottom: 2rem;
 }
@@ -977,7 +980,7 @@ code {
 }
 
 .admin-table thead {
-    background-color: var(--light-bg);
+    background: rgba(0, 212, 255, 0.1);
     border-bottom: 2px solid var(--border-color);
 }
 
@@ -995,7 +998,7 @@ code {
 }
 
 .admin-table tbody tr:hover {
-    background-color: var(--light-bg);
+    background: rgba(0, 212, 255, 0.05);
 }
 
 .admin-table .loading {
@@ -1112,19 +1115,20 @@ code {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .modal-content {
-    background-color: white;
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.95) 100%);
     padding: 2rem;
-    border-radius: 8px;
-    max-width: 500px;
+    border-radius: 12px;
+    max-width: 600px;
     width: 90%;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 212, 255, 0.3);
+    border: 1px solid var(--border-color);
 }
 
 .modal-content h2 {
@@ -1142,7 +1146,7 @@ code {
 }
 
 .close:hover {
-    color: var(--text-color);
+    color: var(--primary-color);
 }
 
 /* ===== Footer ===== */

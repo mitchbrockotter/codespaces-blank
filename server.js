@@ -9,6 +9,7 @@ const cors = require('cors');
 const path = require('path');
 const userDb = require('./src/users/userDatabase');
 const auth = require('./src/users/auth');
+const envDb = require('./src/environments/environmentDatabase');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -371,6 +372,186 @@ app.get('/api/activities', auth.isAuthenticated, auth.isAdmin, (req, res) => {
 app.get('/api/stats', auth.isAuthenticated, auth.isAdmin, (req, res) => {
   const stats = userDb.getSystemStats();
   res.json(stats);
+});
+
+// ============= ENVIRONMENT API ROUTES =============
+
+/**
+ * Get all environments (Admin only)
+ * GET /api/environments
+ */
+app.get('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const environments = envDb.getAllEnvironments();
+  
+  // Enrich with user information
+  const enrichedEnvironments = environments.map(env => {
+    const user = userDb.findById(env.userId);
+    return {
+      ...env,
+      username: user ? user.username : 'Unknown',
+      company: user ? user.company : 'Unknown'
+    };
+  });
+  
+  res.json(enrichedEnvironments);
+});
+
+/**
+ * Get environments for current user
+ * GET /api/environments/my
+ */
+app.get('/api/environments/my', auth.isAuthenticated, (req, res) => {
+  const environments = envDb.getEnvironmentsByUserId(req.session.userId);
+  res.json(environments);
+});
+
+/**
+ * Get environment by ID
+ * GET /api/environments/:id
+ */
+app.get('/api/environments/:id', auth.isAuthenticated, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Check if user has access (admin or owner)
+  if (req.session.role !== 'admin' && environment.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  res.json(environment);
+});
+
+/**
+ * Create new environment (Admin only)
+ * POST /api/environments
+ */
+app.post('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const { userId, name, description, status } = req.body;
+  
+  if (!userId || !name) {
+    return res.status(400).json({ error: 'User ID and name are required' });
+  }
+  
+  // Verify user exists
+  const user = userDb.findById(parseInt(userId));
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+  
+  const newEnvironment = envDb.createEnvironment({
+    userId: parseInt(userId),
+    name,
+    description,
+    status
+  });
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'create_environment', `Created environment: ${name} for user ${user.username}`);
+  
+  res.status(201).json(newEnvironment);
+});
+
+/**
+ * Update environment (Admin only)
+ * PUT /api/environments/:id
+ */
+app.put('/api/environments/:id', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const { name, description, status, tools } = req.body;
+  
+  const updatedEnvironment = envDb.updateEnvironment(req.params.id, {
+    name,
+    description,
+    status,
+    tools
+  });
+  
+  if (!updatedEnvironment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'update_environment', `Updated environment: ${updatedEnvironment.name}`);
+  
+  res.json(updatedEnvironment);
+});
+
+/**
+ * Delete environment (Admin only)
+ * DELETE /api/environments/:id
+ */
+app.delete('/api/environments/:id', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  const success = envDb.deleteEnvironment(req.params.id);
+  
+  if (success) {
+    // Log activity
+    userDb.logActivity(req.session.userId, 'delete_environment', `Deleted environment: ${environment.name}`);
+    res.json({ success: true, message: 'Environment deleted successfully' });
+  } else {
+    res.status(500).json({ error: 'Failed to delete environment' });
+  }
+});
+
+/**
+ * Add tool to environment
+ * POST /api/environments/:id/tools
+ */
+app.post('/api/environments/:id/tools', auth.isAuthenticated, (req, res) => {
+  const { toolName } = req.body;
+  
+  if (!toolName) {
+    return res.status(400).json({ error: 'Tool name is required' });
+  }
+  
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Check access
+  if (req.session.role !== 'admin' && environment.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const updatedEnvironment = envDb.addTool(req.params.id, toolName);
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'add_tool', `Added tool "${toolName}" to environment ${environment.name}`);
+  
+  res.json(updatedEnvironment);
+});
+
+/**
+ * Remove tool from environment
+ * DELETE /api/environments/:id/tools/:toolName
+ */
+app.delete('/api/environments/:id/tools/:toolName', auth.isAuthenticated, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Check access
+  if (req.session.role !== 'admin' && environment.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const updatedEnvironment = envDb.removeTool(req.params.id, req.params.toolName);
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'remove_tool', `Removed tool "${req.params.toolName}" from environment ${environment.name}`);
+  
+  res.json(updatedEnvironment);
 });
 
 // ============= ERROR HANDLING =============

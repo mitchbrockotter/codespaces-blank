@@ -338,3 +338,285 @@ function displayActivityLog() {
         `;
     }).join('');
 }
+
+// ============= ENVIRONMENT MANAGEMENT =============
+
+let allEnvironments = [];
+
+/**
+ * Load environments on page load
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadEnvironments();
+    setupEnvironmentModals();
+    setupEnvironmentSearch();
+});
+
+/**
+ * Load and display all environments
+ */
+async function loadEnvironments() {
+    try {
+        const response = await fetch(apiPath('/api/environments'), {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            allEnvironments = await response.json();
+            displayEnvironments(allEnvironments);
+        }
+    } catch (error) {
+        console.error('Error loading environments:', error);
+    }
+}
+
+/**
+ * Display environments in table
+ */
+function displayEnvironments(environments) {
+    const tbody = document.getElementById('environmentsTableBody');
+    
+    if (environments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-light);">Geen omgevingen gevonden</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = environments.map(env => {
+        const createdDate = new Date(env.createdAt).toLocaleDateString('nl-NL');
+        const statusColors = {
+            'active': 'var(--success-color)',
+            'maintenance': 'var(--warning-color)',
+            'inactive': 'var(--text-light)'
+        };
+        const statusColor = statusColors[env.status] || 'var(--text-light)';
+        
+        return `
+            <tr>
+                <td><code>ENV-${env.id}</code></td>
+                <td>${env.username}</td>
+                <td>${env.company}</td>
+                <td style="color: ${statusColor}; font-weight: 600;">${env.status.toUpperCase()}</td>
+                <td>${env.tools ? env.tools.length : 0} tools</td>
+                <td>${createdDate}</td>
+                <td>
+                    <button class="btn btn-small" onclick="editEnvironment(${env.id})">Bewerken</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+/**
+ * Setup environment modals
+ */
+function setupEnvironmentModals() {
+    const addEnvModal = document.getElementById('addEnvModal');
+    const addEnvBtn = document.getElementById('addEnvBtn');
+    const addEnvClose = document.getElementById('addEnvClose');
+    const addEnvForm = document.getElementById('addEnvForm');
+    
+    const editEnvModal = document.getElementById('editEnvModal');
+    const editEnvClose = document.getElementById('editEnvClose');
+    const editEnvForm = document.getElementById('editEnvForm');
+    const deleteEnvBtn = document.getElementById('deleteEnvBtn');
+
+    // Only setup if elements exist
+    if (!addEnvModal || !editEnvModal) return;
+
+    // Add environment modal
+    addEnvBtn.addEventListener('click', () => {
+        populateUserDropdown();
+        addEnvModal.style.display = 'flex';
+    });
+
+    addEnvClose.addEventListener('click', () => {
+        addEnvModal.style.display = 'none';
+    });
+
+    addEnvForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const newEnv = {
+            userId: document.getElementById('envUserId').value,
+            name: document.getElementById('envName').value,
+            description: document.getElementById('envDescription').value,
+            status: document.getElementById('envStatus').value
+        };
+
+        try {
+            const response = await fetch(apiPath('/api/environments'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(newEnv)
+            });
+
+            if (response.ok) {
+                alert('Omgeving succesvol aangemaakt!');
+                addEnvForm.reset();
+                addEnvModal.style.display = 'none';
+                await loadEnvironments();
+                await loadStats();
+            } else {
+                const error = await response.json();
+                alert('Fout: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error creating environment:', error);
+            alert('Er is een fout opgetreden bij het aanmaken van de omgeving');
+        }
+    });
+
+    // Edit environment modal
+    editEnvClose.addEventListener('click', () => {
+        editEnvModal.style.display = 'none';
+    });
+
+    editEnvForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const envId = document.getElementById('editEnvId').value;
+        const updatedEnv = {
+            name: document.getElementById('editEnvName').value,
+            description: document.getElementById('editEnvDescription').value,
+            status: document.getElementById('editEnvStatus').value
+        };
+
+        try {
+            const response = await fetch(apiPath(`/api/environments/${envId}`), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify(updatedEnv)
+            });
+
+            if (response.ok) {
+                alert('Omgeving succesvol bijgewerkt!');
+                editEnvModal.style.display = 'none';
+                await loadEnvironments();
+            } else {
+                const error = await response.json();
+                alert('Fout: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error updating environment:', error);
+            alert('Er is een fout opgetreden bij het bijwerken');
+        }
+    });
+
+    // Delete environment
+    deleteEnvBtn.addEventListener('click', async () => {
+        const envId = document.getElementById('editEnvId').value;
+        const envName = document.getElementById('editEnvName').value;
+        
+        if (!confirm(`Weet je zeker dat je omgeving "${envName}" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(apiPath(`/api/environments/${envId}`), {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                alert('Omgeving succesvol verwijderd!');
+                editEnvModal.style.display = 'none';
+                await loadEnvironments();
+                await loadStats();
+            } else {
+                const error = await response.json();
+                alert('Fout: ' + error.error);
+            }
+        } catch (error) {
+            console.error('Error deleting environment:', error);
+            alert('Er is een fout opgetreden bij het verwijderen');
+        }
+    });
+
+    // Close modals on outside click
+    window.addEventListener('click', (e) => {
+        if (e.target === addEnvModal) {
+            addEnvModal.style.display = 'none';
+        }
+        if (e.target === editEnvModal) {
+            editEnvModal.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * Populate user dropdown for environment creation
+ */
+function populateUserDropdown() {
+    const select = document.getElementById('envUserId');
+    select.innerHTML = '<option value="">-- Selecteer een gebruiker --</option>';
+    
+    allUsers.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = `${user.username} (${user.company})`;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * Edit environment - opens modal with environment data
+ */
+async function editEnvironment(envId) {
+    try {
+        const response = await fetch(apiPath(`/api/environments/${envId}`), {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const env = await response.json();
+            
+            document.getElementById('editEnvId').value = env.id;
+            document.getElementById('editEnvName').value = env.name;
+            document.getElementById('editEnvDescription').value = env.description || '';
+            document.getElementById('editEnvStatus').value = env.status;
+            
+            // Display tools list
+            const toolsList = document.getElementById('envToolsList');
+            if (env.tools && env.tools.length > 0) {
+                toolsList.innerHTML = env.tools.map(tool => 
+                    `<div style="padding: 0.5rem; background: rgba(0,212,255,0.1); border-radius: 4px; margin-bottom: 0.5rem; border-left: 3px solid var(--primary-color);">
+                        <strong style="color: var(--primary-color);">🔧 ${tool}</strong>
+                    </div>`
+                ).join('');
+            } else {
+                toolsList.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">Geen tools geïnstalleerd</p>';
+            }
+            
+            document.getElementById('editEnvModal').style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading environment:', error);
+        alert('Fout bij het laden van omgevingsgegevens');
+    }
+}
+
+/**
+ * Setup environment search
+ */
+function setupEnvironmentSearch() {
+    const searchInput = document.getElementById('envSearch');
+    if (!searchInput) return;
+    
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        
+        const filtered = allEnvironments.filter(env => {
+            return env.name.toLowerCase().includes(searchTerm) ||
+                   env.username.toLowerCase().includes(searchTerm) ||
+                   env.company.toLowerCase().includes(searchTerm) ||
+                   env.status.toLowerCase().includes(searchTerm);
+        });
+        
+        displayEnvironments(filtered);
+    });
+}
