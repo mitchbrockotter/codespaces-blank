@@ -18,6 +18,10 @@ if (loginForm) {
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('errorMessage');
 
+        console.log('=== LOGIN ATTEMPT ===');
+        console.log('Sending to:', apiPath('/api/login'));
+        console.log('Username:', username);
+
         try {
             const response = await fetch(apiPath('/api/login'), {
                 method: 'POST',
@@ -28,16 +32,25 @@ if (loginForm) {
                 body: JSON.stringify({ username, password })
             });
 
+            console.log('Login response status:', response.status);
+            console.log('Login response headers:', {
+                contentType: response.headers.get('content-type'),
+                setCookie: response.headers.get('set-cookie')
+            });
+
             const data = await response.json();
+            console.log('Login response data:', data);
 
             if (!response.ok) {
+                console.error('Login failed:', data.error);
                 errorDiv.textContent = data.error || 'Login failed';
                 errorDiv.style.display = 'block';
                 return;
             }
 
             // Successful login
-            console.log('Login successful:', data.user);
+            console.log('✅ Login successful:', data.user);
+            console.log('Redirecting to:', data.redirect);
             
             // Redirect based on user role
             setTimeout(() => {
@@ -46,6 +59,7 @@ if (loginForm) {
 
         } catch (error) {
             console.error('Login error:', error);
+            console.error('Error type:', error.name);
             errorDiv.textContent = 'An error occurred. Please try again.';
             errorDiv.style.display = 'block';
         }
