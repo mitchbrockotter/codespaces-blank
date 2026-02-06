@@ -115,8 +115,7 @@ app.get('/environment', auth.isAuthenticated, (req, res) => {
  */
 app.post('/api/login', (req, res) => {
   console.log('=== LOGIN REQUEST ===');
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
+  console.log('Username/Email:', req.body.username);
   
   const { username, password } = req.body;
 
@@ -127,11 +126,11 @@ app.post('/api/login', (req, res) => {
   const user = userDb.authenticateUser(username, password);
 
   if (!user) {
-    console.log('Authentication failed for user:', username);
+    console.log('❌ Authentication failed for user:', username);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  console.log('User authenticated:', user.username);
+  console.log('✅ User authenticated:', { id: user.id, username: user.username, role: user.role });
   
   // Update last login
   userDb.updateUserLastLogin(user.id);
@@ -147,12 +146,16 @@ app.post('/api/login', (req, res) => {
   req.session.role = user.role;
   req.session.environment = user.environment;
 
-  console.log('Session set, userId:', req.session.userId);
+  console.log('📝 Session stored:', { 
+    userId: req.session.userId, 
+    username: req.session.username, 
+    role: req.session.role 
+  });
 
   // Get redirect path from user settings
   const redirectPath = userDb.getUserRedirectPath(user.id);
 
-  console.log('Login successful, redirecting to:', redirectPath);
+  console.log('✅ Login successful, redirecting to:', redirectPath);
 
   // Let Express handle session cookie automatically
   res.json({
@@ -186,6 +189,12 @@ app.post('/api/logout', (req, res) => {
  * GET /api/user
  */
 app.get('/api/user', auth.isAuthenticated, (req, res) => {
+  console.log('GET /api/user - Session:', {
+    userId: req.session.userId,
+    username: req.session.username,
+    role: req.session.role
+  });
+  
   res.json({
     id: req.session.userId,
     username: req.session.username,

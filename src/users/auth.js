@@ -26,7 +26,12 @@ function isAdmin(req, res, next) {
   if (req.session && req.session.userId && req.session.role === 'admin') {
     next();
   } else {
-    res.status(403).json({ error: 'Admin access required' });
+    // Check if this is an API request or page request
+    if (req.path.startsWith('/api/')) {
+      res.status(403).json({ error: 'Admin access required' });
+    } else {
+      res.redirect('/login');
+    }
   }
 }
 
