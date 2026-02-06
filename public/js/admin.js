@@ -10,20 +10,17 @@ let allUsers = [];
 let allActivities = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('Admin page DOMContentLoaded');
+    
     const user = await getCurrentUser();
+    console.log('Current user:', user);
     
     if (user && user.role !== 'admin') {
         window.location.href = '/dashboard';
         return;
     }
 
-    // Load all necessary data
-    await loadUsers();
-    await loadStats();
-    await loadActivityLog();
-    await loadEnvironments();
-
-    // Setup modals
+    // Setup modals first (they don't require data)
     setupAddUserModal();
     setupEditUserModal();
     setupEnvironmentModals();
@@ -31,6 +28,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Setup search
     setupUserSearch();
     setupEnvironmentSearch();
+    
+    // Load all necessary data
+    await loadUsers();
+    await loadStats();
+    await loadActivityLog();
+    await loadEnvironments();
 });
 
 /**
@@ -128,22 +131,35 @@ async function openEditUserModal(userId) {
  * Setup add user modal
  */
 function setupAddUserModal() {
+    console.log('Setting up add user modal...');
+    
     const modal = document.getElementById('addUserModal');
     const addBtn = document.getElementById('addUserBtn');
     const closeBtn = modal ? modal.querySelector('.close') : null;
     const form = document.getElementById('addUserForm');
 
+    console.log('Modal elements:', { modal: !!modal, addBtn: !!addBtn, closeBtn: !!closeBtn, form: !!form });
+
     if (!modal || !addBtn || !closeBtn || !form) {
         console.error('Add user modal elements not found');
+        console.error('Missing elements:', {
+            modal: !modal,
+            addBtn: !addBtn,
+            closeBtn: !closeBtn,
+            form: !form
+        });
         return;
     }
 
-    addBtn.addEventListener('click', () => {
-        console.log('Add User button clicked');
+    console.log('Adding click listener to addUserBtn');
+    addBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Add User button clicked!');
         modal.style.display = 'flex';
     });
 
     closeBtn.addEventListener('click', () => {
+        console.log('Close button clicked');
         modal.style.display = 'none';
     });
 
@@ -155,6 +171,7 @@ function setupAddUserModal() {
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        console.log('Form submitted');
 
         const newUser = {
             username: document.getElementById('newUsername').value,
@@ -163,6 +180,8 @@ function setupAddUserModal() {
             company: document.getElementById('newCompany').value,
             role: document.getElementById('newRole').value
         };
+
+        console.log('Creating user:', newUser);
 
         try {
             const response = await fetch(apiPath('/api/users'), {
