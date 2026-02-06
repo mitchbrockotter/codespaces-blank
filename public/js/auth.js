@@ -8,21 +8,25 @@ if (typeof API_BASE === 'undefined') {
 }
 function apiPath(path){ return API_BASE + path; }
 
-// Handle login form submission
-console.log('🔍 Looking for loginForm...');
-const loginForm = document.getElementById('loginForm');
-console.log('loginForm found:', !!loginForm);
+// Handle login button click
+console.log('🔍 Looking for loginBtn...');
+const loginBtn = document.getElementById('loginBtn');
+console.log('loginBtn found:', !!loginBtn);
 
-if (loginForm) {
-    console.log('✅ Attaching login event listener');
-    loginForm.addEventListener('submit', async (e) => {
-        console.log('🎯 Login form submit event fired');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
+if (loginBtn) {
+    console.log('✅ Attaching login button click listener');
+    loginBtn.addEventListener('click', async (e) => {
+        console.log('🎯 Login button clicked!');
+        
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         const errorDiv = document.getElementById('errorMessage');
+
+        if (!username || !password) {
+            errorDiv.textContent = 'Please enter username and password';
+            errorDiv.style.display = 'block';
+            return;
+        }
 
         console.log('=== LOGIN ATTEMPT ===');
         console.log('Sending to:', apiPath('/api/login'));
@@ -71,7 +75,20 @@ if (loginForm) {
         }
     });
 } else {
-    console.error('❌ loginForm not found in DOM');
+    console.error('❌ loginBtn not found in DOM');
+}
+
+// Handle login form submission (fallback for Enter key)
+const loginForm = document.getElementById('loginForm');
+if (loginForm) {
+    console.log('✅ Attaching login form fallback listener');
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        console.log('🎯 Login form submitted (Enter key)');
+        if (loginBtn) {
+            loginBtn.click();
+        }
+    });
 }
 
 // Logout functionality
