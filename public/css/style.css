@@ -27,29 +27,15 @@ body {
     line-height: 1.6;
     color: var(--text-color);
     background: 
-        repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 79px,
-            rgba(0, 212, 255, 0.15) 79px,
-            rgba(0, 212, 255, 0.15) 81px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent,
-            transparent 79px,
-            rgba(0, 212, 255, 0.15) 79px,
-            rgba(0, 212, 255, 0.15) 81px
-        ),
-        linear-gradient(135deg, #0a0f14 0%, #1a2635 50%, #0f1923 100%);
-    background-attachment: fixed;
-    background-size: 80px 80px, 80px 80px, cover;
+        url('/images/background.jpg') center center / cover no-repeat fixed,
+        linear-gradient(135deg, rgba(10, 15, 20, 0.85) 0%, rgba(26, 38, 53, 0.85) 100%);
+    background-blend-mode: overlay;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
 }
 
-/* Tech kabels/circuit effect */
+/* Tech overlay effect */
 body::before {
     content: '';
     position: fixed;
@@ -58,17 +44,16 @@ body::before {
     right: 0;
     bottom: 0;
     background: 
-        radial-gradient(circle at 25% 30%, rgba(0, 212, 255, 0.2) 0%, transparent 40%),
-        radial-gradient(circle at 75% 70%, rgba(255, 0, 110, 0.15) 0%, transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(0, 153, 204, 0.1) 0%, transparent 60%);
+        radial-gradient(circle at 25% 30%, rgba(0, 212, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 75% 70%, rgba(255, 0, 110, 0.1) 0%, transparent 40%);
     pointer-events: none;
     z-index: 1;
     animation: techGlow 10s ease-in-out infinite alternate;
 }
 
 @keyframes techGlow {
-    0% { opacity: 0.7; transform: scale(1); }
-    100% { opacity: 1; transform: scale(1.05); }
+    0% { opacity: 0.7; }
+    100% { opacity: 1; }
 }
 
 a {
@@ -133,15 +118,22 @@ code {
     height: 40px;
     width: auto;
     object-fit: contain;
-    filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.4));
+    filter: 
+        drop-shadow(0 0 10px rgba(0, 212, 255, 0.4))
+        brightness(0.95)
+        contrast(1.5);
     transition: var(--transition);
-    /* Remove white background completely */
-    background: transparent;
-    isolation: isolate;
+    /* Perfect transparency - remove white completely */
+    -webkit-mask-image: linear-gradient(rgba(0,0,0,1), rgba(0,0,0,1));
+    mask-image: linear-gradient(rgba(0,0,0,1), rgba(0,0,0,1));
+    background: none !important;
 }
 
 .navbar-logo:hover {
-    filter: drop-shadow(0 0 18px rgba(0, 212, 255, 0.7));
+    filter: 
+        drop-shadow(0 0 18px rgba(0, 212, 255, 0.7))
+        brightness(1)
+        contrast(1.5);
 }
 
 .navbar-brand span {
@@ -340,11 +332,15 @@ code {
     width: auto;
     object-fit: contain;
     margin-bottom: 2rem;
-    filter: drop-shadow(0 20px 50px rgba(0, 212, 255, 0.6));
+    filter: 
+        drop-shadow(0 20px 50px rgba(0, 212, 255, 0.6))
+        brightness(0.95)
+        contrast(1.5);
     animation: pulse 2s ease-in-out infinite;
-    /* Remove white background completely */
-    background: transparent;
-    isolation: isolate;
+    /* Perfect transparency - remove white completely */
+    -webkit-mask-image: linear-gradient(rgba(0,0,0,1), rgba(0,0,0,1));
+    mask-image: linear-gradient(rgba(0,0,0,1), rgba(0,0,0,1));
+    background: none !important;
 }
 
 @keyframes pulse {
