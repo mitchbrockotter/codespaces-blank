@@ -7,6 +7,7 @@ const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 const userDb = require('./src/users/userDatabase');
 const auth = require('./src/users/auth');
 const envDb = require('./src/environments/environmentDatabase');
@@ -48,6 +49,29 @@ app.use((req, res, next) => {
 app.use(express.static('public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'projects/')
+  },
+  filename: function (req, file, cb) {
+    const timestamp = Date.now();
+    cb(null, timestamp + '-' + file.originalname)
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: function (req, file, cb) {
+    // Only allow .jar files
+    if (file.originalname.endsWith('.jar')) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only .jar files are allowed'))
+    }
+  }
+});
 
 // Session configuration
 app.use(session({
@@ -641,6 +665,118 @@ app.delete('/api/environments/:id/tools/:toolName', auth.isAuthenticated, (req, 
   userDb.logActivity(req.session.userId, 'remove_tool', `Removed tool "${req.params.toolName}" from environment ${environment.name}`);
   
   res.json(updatedEnvironment);
+});
+
+/**
+ * Upload IntelliJ project (JAR file) to environment
+ * POST /api/environments/:id/projects/upload
+ */
+app.post('/api/environments/:id/projects/upload', auth.isAuthenticated, auth.isAdmin, upload.single('jarFile'), (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  
+  const projectName = req.body.projectName || req.file.originalname.replace('.jar', '');
+  
+  // Add project to environment
+  const project = envDb.addProject(req.params.id, {
+    name: projectName,
+    jarFile: req.file.filename
+  });
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'upload_project', `Uploaded project "${projectName}" to environment ${environment.name}`);
+  
+  res.status(201).json({
+    success: true,
+    project: project
+  });
+});
+
+/**
+ * Run IntelliJ project JAR
+ * POST /api/environments/:id/projects/:projectName/run
+ */
+app.post('/api/environments/:id/projects/:projectName/run', auth.isAuthenticated, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Check access
+  if (req.session.role !== 'admin' && environment.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  const project = environment.projects && environment.projects.find(p => p.name === req.params.projectName);
+  
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'run_project', `Executed project "${req.params.projectName}" in environment ${environment.name}`);
+  
+  // In production, you would use child_process.spawn to actually execute the JAR
+  // For now, we'll just return a success message
+  res.json({
+    success: true,
+    message: `Project "${req.params.projectName}" started successfully`,
+    projectName: req.params.projectName,
+    jarFile: project.jarFile
+  });
+});
+
+/**
+ * Get projects in environment
+ * GET /api/environments/:id/projects
+ */
+app.get('/api/environments/:id/projects', auth.isAuthenticated, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  // Check access
+  if (req.session.role !== 'admin' && environment.userId !== req.session.userId) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+  
+  res.json(environment.projects || []);
+});
+
+/**
+ * Delete project from environment
+ * DELETE /api/environments/:id/projects/:projectName
+ */
+app.delete('/api/environments/:id/projects/:projectName', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const environment = envDb.getEnvironmentById(req.params.id);
+  
+  if (!environment) {
+    return res.status(404).json({ error: 'Environment not found' });
+  }
+  
+  const deleted = envDb.removeProject(req.params.id, req.params.projectName);
+  
+  if (!deleted) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+  
+  // Log activity
+  userDb.logActivity(req.session.userId, 'delete_project', `Deleted project "${req.params.projectName}" from environment ${environment.name}`);
+  
+  res.json({
+    success: true,
+    message: `Project "${req.params.projectName}" deleted successfully`
+  });
 });
 
 // ============= ERROR HANDLING =============

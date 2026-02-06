@@ -1,0 +1,2 @@
+# This file ensures the projects directory is tracked by git
+# JAR files will be uploaded here but are ignored by .gitignore

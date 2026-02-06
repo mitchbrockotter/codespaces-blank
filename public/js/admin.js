@@ -629,6 +629,133 @@ function setupEnvironmentModals() {
             editEnvModal.style.display = 'none';
         }
     });
+    
+    // Setup project upload handler
+    setupProjectUpload();
+}
+
+/**
+ * Setup project upload functionality
+ */
+function setupProjectUpload() {
+    const uploadProjectBtn = document.getElementById('uploadProjectBtn');
+    const uploadProjectInput = document.getElementById('uploadProjectInput');
+    const projectNameInput = document.getElementById('projectNameInput');
+    
+    if (!uploadProjectBtn || !uploadProjectInput) {
+        console.log('Project upload elements not found');
+        return;
+    }
+    
+    uploadProjectBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        
+        const envId = document.getElementById('editEnvId').value;
+        if (!envId) {
+            alert('Please select an environment first');
+            return;
+        }
+        
+        if (!uploadProjectInput.files || uploadProjectInput.files.length === 0) {
+            alert('Please select a JAR file');
+            return;
+        }
+        
+        const file = uploadProjectInput.files[0];
+        if (!file.name.endsWith('.jar')) {
+            alert('Only JAR files are allowed');
+            return;
+        }
+        
+        const projectName = projectNameInput.value.trim() || file.name.replace('.jar', '');
+        
+        const formData = new FormData();
+        formData.append('jarFile', file);
+        formData.append('projectName', projectName);
+        
+        console.log('Uploading project:', projectName);
+        
+        try {
+            const response = await fetch(apiPath(`/api/environments/${envId}/projects/upload`), {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'X-User-Id': JSON.parse(localStorage.getItem('user')).id,
+                    'X-User-Role': JSON.parse(localStorage.getItem('user')).role
+                },
+                body: formData
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                alert('✅ Project uploaded successfully!');
+                uploadProjectInput.value = '';
+                projectNameInput.value = '';
+                // Reload environment details
+                const envId = document.getElementById('editEnvId').value;
+                if (envId) {
+                    await editEnvironment(envId);
+                }
+            } else {
+                const error = await response.json();
+                alert('❌ Error uploading project: ' + (error.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error uploading project:', error);
+            alert('Error uploading project: ' + error.message);
+        }
+    });
+}
+
+/**
+ * Run IntelliJ project
+ */
+async function runProject(envId, projectName) {
+    console.log('Running project:', projectName);
+    
+    try {
+        const response = await apiCall(`/api/environments/${envId}/projects/${projectName}/run`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert('✅ Project started successfully!\\nProject: ' + projectName);
+        } else {
+            const error = await response.json();
+            alert('❌ Error running project: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error running project:', error);
+        alert('Error running project: ' + error.message);
+    }
+}
+
+/**
+ * Delete IntelliJ project
+ */
+async function deleteProject(envId, projectName) {
+    if (!confirm(`Are you sure you want to delete the project "${projectName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await apiCall(`/api/environments/${envId}/projects/${projectName}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('✅ Project deleted successfully!');
+            // Reload environment details
+            await editEnvironment(envId);
+        } else {
+            const error = await response.json();
+            alert('❌ Error deleting project: ' + (error.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting project:', error);
+        alert('Error deleting project: ' + error.message);
+    }
 }
 
 /**
@@ -671,6 +798,24 @@ async function editEnvironment(envId) {
                 ).join('');
             } else {
                 toolsList.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">Geen tools geïnstalleerd</p>';
+            }
+            
+            // Display projects list
+            const projectsList = document.getElementById('envProjectsList');
+            if (projectsList) {
+                if (env.projects && env.projects.length > 0) {
+                    projectsList.innerHTML = env.projects.map(project => 
+                        `<div style="padding: 0.75rem; background: rgba(255, 0, 110, 0.1); border-radius: 4px; margin-bottom: 0.5rem; border-left: 3px solid #ff006e; display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="color: #ff006e; flex: 1;">📦 ${project.name}</strong>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="runProject(${env.id}, '${project.name}')" class="btn btn-small" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: #00d4ff; color: black; border: none; cursor: pointer;">▶️ Uitvoeren</button>
+                                <button onclick="deleteProject(${env.id}, '${project.name}')" class="btn btn-small" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: #ff006e; color: white; border: none; cursor: pointer;">🗑️ Verwijderen</button>
+                            </div>
+                        </div>`
+                    ).join('');
+                } else {
+                    projectsList.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">Geen IntelliJ projecten geüpload</p>';
+                }
             }
             
             document.getElementById('editEnvModal').style.display = 'flex';

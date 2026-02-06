@@ -12,6 +12,7 @@ let environments = [
     description: 'Production environment for ACME Corporation automation tools',
     status: 'active',
     tools: ['Report Generator v2.1', 'Data Sync Tool v1.5'],
+    projects: [],
     createdAt: new Date('2026-01-15'),
     updatedAt: new Date('2026-02-01')
   },
@@ -22,6 +23,7 @@ let environments = [
     description: 'Development and testing environment',
     status: 'active',
     tools: ['API Monitor v1.0', 'Log Analyzer v2.0', 'Backup Scheduler v1.2'],
+    projects: [],
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-02-03')
   },
@@ -32,6 +34,7 @@ let environments = [
     description: 'Staging environment for pre-production testing',
     status: 'active',
     tools: ['Database Migration Tool v1.3'],
+    projects: [],
     createdAt: new Date('2026-01-20'),
     updatedAt: new Date('2026-01-25')
   }
@@ -73,6 +76,7 @@ function createEnvironment(envData) {
     description: envData.description || '',
     status: envData.status || 'active',
     tools: envData.tools || [],
+    projects: [],
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -155,6 +159,52 @@ function removeTool(environmentId, toolName) {
   return env;
 }
 
+/**
+ * Add project to environment
+ */
+function addProject(envId, projectData) {
+  const env = getEnvironmentById(envId);
+  
+  if (!env) {
+    return null;
+  }
+  
+  if (!env.projects) {
+    env.projects = [];
+  }
+  
+  const newProject = {
+    name: projectData.name,
+    jarFile: projectData.jarFile,
+    uploadedAt: new Date()
+  };
+  
+  env.projects.push(newProject);
+  env.updatedAt = new Date();
+  
+  return newProject;
+}
+
+/**
+ * Remove project from environment
+ */
+function removeProject(envId, projectName) {
+  const env = getEnvironmentById(envId);
+  
+  if (!env || !env.projects) {
+    return false;
+  }
+  
+  const projectIndex = env.projects.findIndex(p => p.name === projectName);
+  if (projectIndex > -1) {
+    env.projects.splice(projectIndex, 1);
+    env.updatedAt = new Date();
+    return true;
+  }
+  
+  return false;
+}
+
 module.exports = {
   getAllEnvironments,
   getEnvironmentById,
@@ -163,5 +213,7 @@ module.exports = {
   updateEnvironment,
   deleteEnvironment,
   addTool,
-  removeTool
+  removeTool,
+  addProject,
+  removeProject
 };

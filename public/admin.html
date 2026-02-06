@@ -214,6 +214,29 @@
                         <p style="color: var(--text-light); font-size: 0.9rem;">Geen tools geïnstalleerd</p>
                     </div>
                 </div>
+                
+                <div class="form-group">
+                    <label>IntelliJ Projecten</label>
+                    <div id="envProjectsList" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 6px; min-height: 100px; margin-bottom: 1rem;">
+                        <p style="color: var(--text-light); font-size: 0.9rem;">Geen IntelliJ projecten geüpload</p>
+                    </div>
+                    <div style="border: 2px dashed rgba(0,212,255,0.3); border-radius: 6px; padding: 1rem; background: rgba(0,212,255,0.05);">
+                        <h4 style="color: var(--primary-color); margin-bottom: 0.75rem; font-size: 0.95rem;">📦 Upload IntelliJ Project (JAR)</h4>
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <label for="projectNameInput" style="font-size: 0.85rem; color: var(--text-light);">Project Naam (optioneel)</label>
+                            <input type="text" id="projectNameInput" placeholder="Bijv. Report Generator" style="font-size: 0.85rem; padding: 0.5rem;">
+                            <small class="hint" style="font-size: 0.75rem;">Laat leeg om de bestandsnaam te gebruiken</small>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0.75rem;">
+                            <label for="uploadProjectInput" style="font-size: 0.85rem; color: var(--text-light);">Selecteer JAR bestand *</label>
+                            <input type="file" id="uploadProjectInput" accept=".jar" style="font-size: 0.85rem; padding: 0.5rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(0,212,255,0.3); color: var(--text-color);">
+                        </div>
+                        <button type="button" id="uploadProjectBtn" class="btn btn-primary" style="width: 100%; padding: 0.65rem; font-size: 0.85rem; background: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);">
+                            ⬆️ Upload Project
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">Wijzigingen Opslaan</button>
                     <button type="button" id="deleteEnvBtn" class="btn btn-danger">Omgeving Verwijderen</button>

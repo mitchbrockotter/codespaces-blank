@@ -1,1 +1,9 @@
 .vercel
+# Uploaded IntelliJ projects
+projects/*.jar
+
+# Node modules (if not already ignored)
+node_modules/
+
+# Environment variables
+.env
