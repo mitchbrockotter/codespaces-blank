@@ -29,12 +29,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({
   secret: 'pk-backend-automation-secret-key-2026',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: { 
     secure: process.env.NODE_ENV === 'production', // Use HTTPS cookies in production
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Required for cross-domain cookies
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Required for cross-domain cookies
+    path: '/',
+    domain: process.env.NODE_ENV === 'production' ? undefined : 'localhost'
   }
 }));
 
@@ -88,6 +90,10 @@ app.get('/environment', auth.isAuthenticated, (req, res) => {
  * POST /api/login
  */
 app.post('/api/login', (req, res) => {
+  console.log('=== LOGIN REQUEST ===');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -97,9 +103,12 @@ app.post('/api/login', (req, res) => {
   const user = userDb.authenticateUser(username, password);
 
   if (!user) {
+    console.log('Authentication failed for user:', username);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
+  console.log('User authenticated:', user.username);
+  
   // Update last login
   userDb.updateUserLastLogin(user.id);
   
@@ -114,8 +123,12 @@ app.post('/api/login', (req, res) => {
   req.session.role = user.role;
   req.session.environment = user.environment;
 
+  console.log('Session created:', req.session);
+
   // Get redirect path from user settings
   const redirectPath = userDb.getUserRedirectPath(user.id);
+
+  console.log('Login successful, redirecting to:', redirectPath);
 
   res.json({
     success: true,
@@ -148,6 +161,10 @@ app.post('/api/logout', (req, res) => {
  * GET /api/user
  */
 app.get('/api/user', auth.isAuthenticated, (req, res) => {
+  console.log('=== GET /api/user ===');
+  console.log('Session:', req.session);
+  console.log('User ID in session:', req.session.userId);
+  
   res.json({
     id: req.session.userId,
     username: req.session.username,

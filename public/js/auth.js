@@ -76,28 +76,45 @@ if (logoutBtn) {
  */
 async function getCurrentUser() {
     try {
+        console.log('Fetching user from:', apiPath('/api/user'));
         const response = await fetch(apiPath('/api/user'), {
-            credentials: 'include'
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
+        
+        console.log('Response status:', response.status);
+        console.log('Response headers:', {
+            contentType: response.headers.get('content-type'),
+            setCookie: response.headers.get('set-cookie')
+        });
+        
         if (response.ok) {
             const data = await response.json();
+            console.log('User data received:', data);
             return data;
         }
+        
         // If not OK, check if it's JSON or HTML
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
             try {
                 const errorData = await response.json();
-                console.log('API error:', errorData);
+                console.log('Error response:', errorData);
             } catch (e) {
                 console.log('Could not parse error response as JSON');
             }
         } else {
-            console.log('Received non-JSON response, status:', response.status);
+            const text = await response.text();
+            console.log('Received non-JSON response:', text.substring(0, 200));
         }
         return null;
     } catch (error) {
         console.error('Error fetching user:', error);
+        console.error('Error type:', error.name);
+        console.error('Error message:', error.message);
         return null;
     }
 }
