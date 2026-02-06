@@ -129,5 +129,23 @@
     <script src="/env.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/environment.js"></script>
+    <script>
+        // Prevent page load if not authenticated
+        console.log('🔐 Environment page auth check...');
+        const userJson = localStorage.getItem('user');
+        if (!userJson) {
+            console.warn('❌ No user in localStorage, redirecting to login...');
+            setTimeout(() => { window.location.href = '/login'; }, 100);
+        } else {
+            try {
+                const user = JSON.parse(userJson);
+                console.log('👤 Found user in localStorage:', user.username);
+                console.log('✅ User is authenticated, allowing access');
+            } catch (e) {
+                console.error('❌ Error parsing user from localStorage:', e);
+                setTimeout(() => { window.location.href = '/login'; }, 100);
+            }
+        }
+    </script>
 </body>
 </html>

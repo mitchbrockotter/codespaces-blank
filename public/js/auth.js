@@ -61,6 +61,11 @@ if (loginBtn) {
             // Successful login
             console.log('✅ Login successful:', data.user);
             console.log('Redirecting to:', data.redirect);
+            
+            // Store user info in localStorage for persistent session
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('redirectPath', data.redirect);
+            console.log('💾 User stored in localStorage');
             console.log('⏳ Redirecting in 5 seconds...');
             
             // Show success message
@@ -107,11 +112,19 @@ if (logoutBtn) {
                 credentials: 'include'
             });
 
+            // Clear localStorage on logout
+            localStorage.removeItem('user');
+            localStorage.removeItem('redirectPath');
+            
             if (response.ok) {
                 window.location.href = '/login';
             }
         } catch (error) {
             console.error('Logout error:', error);
+            // Still clear storage on error
+            localStorage.removeItem('user');
+            localStorage.removeItem('redirectPath');
+            window.location.href = '/login';
         }
     });
 }
@@ -120,6 +133,19 @@ if (logoutBtn) {
  * Get current user information
  */
 async function getCurrentUser() {
+    // First check localStorage (from recent login)
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        try {
+            const user = JSON.parse(storedUser);
+            console.log('✅ User found in localStorage:', user);
+            return user;
+        } catch (e) {
+            console.error('Error parsing stored user:', e);
+        }
+    }
+    
+    // If not in localStorage, try API call
     try {
         console.log('Fetching user from:', apiPath('/api/user'));
         const response = await fetch(apiPath('/api/user'), {
@@ -139,6 +165,8 @@ async function getCurrentUser() {
         if (response.ok) {
             const data = await response.json();
             console.log('User data received:', data);
+            // Store in localStorage for future use
+            localStorage.setItem('user', JSON.stringify(data));
             return data;
         }
         

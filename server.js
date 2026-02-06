@@ -88,22 +88,25 @@ app.get('/login', (req, res) => {
 
 /**
  * Dashboard (Protected - Customer & Admin)
+ * Frontend checks localStorage for authentication
  */
-app.get('/dashboard', auth.isAuthenticated, (req, res) => {
+app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 /**
  * Admin Panel (Protected - Admin only)
+ * Frontend checks localStorage for authentication
  */
-app.get('/admin', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 /**
  * User Environment (Protected - Customer & Admin)
+ * Frontend checks localStorage for authentication
  */
-app.get('/environment', auth.isAuthenticated, (req, res) => {
+app.get('/environment', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'environment.html'));
 });
 
@@ -157,17 +160,25 @@ app.post('/api/login', (req, res) => {
 
   console.log('✅ Login successful, redirecting to:', redirectPath);
 
-  // Let Express handle session cookie automatically
-  res.json({
-    success: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      company: user.company,
-      role: user.role,
-      environment: user.environment
-    },
-    redirect: redirectPath
+  // Explicitly save the session before sending response
+  req.session.save((err) => {
+    if (err) {
+      console.error('⚠️ Session save error:', err);
+    } else {
+      console.log('✅ Session saved successfully');
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        company: user.company,
+        role: user.role,
+        environment: user.environment
+      },
+      redirect: redirectPath
+    });
   });
 });
 

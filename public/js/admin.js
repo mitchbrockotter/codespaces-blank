@@ -54,9 +54,17 @@ async function loadUsers() {
         const response = await fetch(apiPath('/api/users'), {
             credentials: 'include'
         });
+        console.log('GET /api/users response:', response.status);
         if (response.ok) {
             allUsers = await response.json();
             displayUsers(allUsers);
+        } else {
+            const errData = await response.json().catch(() => ({}));
+            console.error('Error loading users:', response.status, errData);
+            const tbody = document.getElementById('usersTableBody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" class="loading">⚠️ Failed to load users (${response.status}). Try refreshing the page.</td></tr>`;
+            }
         }
     } catch (error) {
         console.error('Error loading users:', error);

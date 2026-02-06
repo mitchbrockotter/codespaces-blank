@@ -328,5 +328,28 @@
     <script src="/env.js"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/admin.js"></script>
+    <script>
+        // Prevent page load if not authenticated as admin
+        console.log('🔐 Admin page auth check...');
+        const userJson = localStorage.getItem('user');
+        if (!userJson) {
+            console.warn('❌ No user in localStorage, redirecting to login...');
+            setTimeout(() => { window.location.href = '/login'; }, 100);
+        } else {
+            try {
+                const user = JSON.parse(userJson);
+                console.log('👤 Found user in localStorage:', user.username, 'Role:', user.role);
+                if (user.role !== 'admin') {
+                    console.warn('❌ User is not admin (' + user.role + '), redirecting to dashboard...');
+                    setTimeout(() => { window.location.href = '/dashboard'; }, 100);
+                } else {
+                    console.log('✅ User is admin, allowing access');
+                }
+            } catch (e) {
+                console.error('❌ Error parsing user from localStorage:', e);
+                setTimeout(() => { window.location.href = '/login'; }, 100);
+            }
+        }
+    </script>
 </body>
 </html>
