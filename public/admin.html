@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - P&K Backend Automation</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="navbar-container">
+            <div class="navbar-left">
+                <a href="/admin" class="navbar-brand">
+                    <img src="/../ChatGPT Image Feb 6, 2026, 09_41_52 AM.png" alt="P&K Backend Automation Logo" class="navbar-logo">
+                    <span>Admin Panel</span>
+                </a>
+            </div>
+            <div class="navbar-right">
+                <span id="userDisplay" class="user-display"></span>
+                <button id="logoutBtn" class="btn btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <ul class="sidebar-menu">
+                <li><a href="/dashboard" class="menu-item">Dashboard</a></li>
+                <li><a href="/admin" class="menu-item active">User Management</a></li>
+                <li><a href="#activities" class="menu-item">Activity Log</a></li>
+                <li><a href="/environment" class="menu-item">My Environment</a></li>
+                <li><a href="#" class="menu-item">System Settings</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-content">
+            <div class="content-header">
+                <h1>Admin Control Panel</h1>
+                <p>Manage users, permissions, and system configuration</p>
+            </div>
+
+            <!-- System Statistics -->
+            <div class="admin-section">
+                <h2>System Overview</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalUsers">-</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="activeUsers">-</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalEnvironments">-</div>
+                        <div class="stat-label">Environments</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="serverStatus">-</div>
+                        <div class="stat-label">Server Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Management Section -->
+            <div class="admin-section">
+                <h2>User Management</h2>
+                
+                <div class="admin-controls">
+                    <input type="text" id="userSearch" placeholder="Search users..." class="search-input">
+                    <button id="addUserBtn" class="btn btn-primary">+ Add New User</button>
+                </div>
+
+                <div id="usersTable" class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Company</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Redirect</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="8" class="loading">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Activity Log Section -->
+            <div class="admin-section" id="activities">
+                <h2>Recent Activity Log</h2>
+                
+                <div class="activity-section">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityTableBody">
+                            <tr>
+                                <td colspan="4" class="loading">Loading activity log...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add New User</h2>
+            <form id="addUserForm" class="form">
+                <div class="form-group">
+                    <label for="newUsername">Username</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newEmail">Email</label>
+                    <input type="email" id="newEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Password</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newCompany">Company</label>
+                    <input type="text" id="newCompany" required>
+                </div>
+                <div class="form-group">
+                    <label for="newRole">Role</label>
+                    <select id="newRole">
+                        <option value="customer">Customer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newRedirectPath">Redirect Path After Login</label>
+                    <select id="newRedirectPath">
+                        <option value="/dashboard">Customer Dashboard</option>
+                        <option value="/admin">Admin Panel</option>
+                        <option value="/environment">Environment</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Create User</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="editUserClose">&times;</span>
+            <h2>Edit User</h2>
+            <form id="editUserForm" class="form">
+                <input type="hidden" id="editUserId">
+                
+                <div class="form-group">
+                    <label for="editUsername">Username</label>
+                    <input type="text" id="editUsername" disabled>
+                </div>
+                <div class="form-group">
+                    <label for="editEmail">Email</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCompany">Company</label>
+                    <input type="text" id="editCompany" required>
+                </div>
+                <div class="form-group">
+                    <label for="editRole">Role</label>
+                    <select id="editRole">
+                        <option value="customer">Customer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editEnvironment">Environment</label>
+                    <input type="text" id="editEnvironment" required>
+                </div>
+                <div class="form-group">
+                    <label for="editRedirectPath">Redirect Path After Login</label>
+                    <select id="editRedirectPath">
+                        <option value="/dashboard">Customer Dashboard</option>
+                        <option value="/admin">Admin Panel</option>
+                        <option value="/environment">Environment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editStatus">Status</label>
+                    <select id="editStatus">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" id="deleteUserBtn" class="btn btn-danger">Delete User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/admin.js"></script>
+</body>
+</html>

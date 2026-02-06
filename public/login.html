@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Login - P&K Backend Automation</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-left">
+                <a href="/" class="navbar-brand">
+                    <img src="/../ChatGPT Image Feb 6, 2026, 09_41_52 AM.png" alt="P&K Backend Automation Logo" class="navbar-logo">
+                    <span>P&K Backend Automation</span>
+                </a>
+            </div>
+            <div class="navbar-right">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/login" class="nav-link nav-login active">Login</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="login-container">
+        <div class="login-box">
+            <h1>Customer Login</h1>
+            <p class="login-subtitle">Access your backend environment</p>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required placeholder="Enter your username">
+                    <small class="hint">Demo: acme_customer</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                    <small class="hint">Demo: password123</small>
+                </div>
+
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+
+            <div class="login-footer">
+                <p>Don't have an account? <a href="/">Contact us</a></p>
+            </div>
+        </div>
+
+        <div class="demo-credentials">
+            <h3>Demo Credentials</h3>
+            <p><strong>Customer Account:</strong></p>
+            <code>Username: acme_customer<br>Password: password123</code>
+            
+            <p style="margin-top: 15px;"><strong>Admin Account:</strong></p>
+            <code>Username: techstart_admin<br>Password: securepass456</code>
+        </div>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/auth.js"></script>
+</body>
+</html>

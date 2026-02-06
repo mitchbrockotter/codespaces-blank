@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Environment - P&K Backend Automation</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="navbar-container">
+            <div class="navbar-left">
+                <a href="/dashboard" class="navbar-brand">
+                    <img src="/../ChatGPT Image Feb 6, 2026, 09_41_52 AM.png" alt="P&K Backend Automation Logo" class="navbar-logo">
+                    <span>P&K Backend Automation</span>
+                </a>
+            </div>
+            <div class="navbar-right">
+                <span id="userDisplay" class="user-display"></span>
+                <button id="logoutBtn" class="btn btn-small">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <ul class="sidebar-menu">
+                <li><a href="/dashboard" class="menu-item">Dashboard</a></li>
+                <li><a href="/environment" class="menu-item active">My Environment</a></li>
+                <li><a href="#" class="menu-item">Settings</a></li>
+                <li><a href="#" class="menu-item">Support</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-content">
+            <div class="content-header">
+                <h1>Your Backend Environment</h1>
+                <p>Manage and monitor your dedicated environment</p>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <h3>🌍 Environment Details</h3>
+                    <div class="card-content">
+                        <div class="info-row">
+                            <span class="info-label">Environment Name:</span>
+                            <span id="envName" class="info-value">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Company:</span>
+                            <span id="envCompany" class="info-value">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Status:</span>
+                            <span id="envStatus" class="info-value status-operational">Operational</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Uptime:</span>
+                            <span id="envUptime" class="info-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>🔧 Services</h3>
+                    <div class="card-content">
+                        <ul id="servicesList" class="services-list">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>📊 Dashboards</h3>
+                    <div class="card-content">
+                        <ul id="dashboardsList" class="dashboards-list">
+                            <li>Loading...</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>🔐 Quick Links</h3>
+                    <div class="card-content">
+                        <a href="#" class="link-button">View Logs</a>
+                        <a href="#" class="link-button">Configure Service</a>
+                        <a href="#" class="link-button">Download Report</a>
+                        <a href="#" class="link-button">Request Support</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2>Environment Metrics</h2>
+                <div class="metrics-table">
+                    <div class="metric-row">
+                        <span class="metric-label">CPU Usage</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: 45%;"></div>
+                        </div>
+                        <span class="metric-value">45%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Memory Usage</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: 62%;"></div>
+                        </div>
+                        <span class="metric-value">62%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Disk Usage</span>
+                        <div class="metric-bar">
+                            <div class="metric-fill" style="width: 78%;"></div>
+                        </div>
+                        <span class="metric-value">78%</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/environment.js"></script>
+</body>
+</html>
