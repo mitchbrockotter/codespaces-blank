@@ -159,23 +159,34 @@ app.get('/api/user', auth.isAuthenticated, (req, res) => {
 });
 
 /**
- * Get environment details
+ * Get environment details for current user
  * GET /api/environment
  */
 app.get('/api/environment', auth.isAuthenticated, (req, res) => {
-  const envData = userDb.getUserEnvironment(req.session.userId);
+  // Get user's environments from environment database
+  const userEnvironments = envDb.getEnvironmentsByUserId(req.session.userId);
   
-  if (!envData) {
-    return res.status(404).json({ error: 'Environment not found' });
+  if (!userEnvironments || userEnvironments.length === 0) {
+    return res.status(404).json({ 
+      error: 'No environment found',
+      message: 'Contact your administrator to create an environment for you.'
+    });
   }
 
-  // Add sample environment data based on role
+  // Return the first (primary) environment with enhanced data
+  const primaryEnv = userEnvironments[0];
   const environmentDetails = {
-    ...envData,
+    id: primaryEnv.id,
+    name: primaryEnv.name,
+    description: primaryEnv.description,
+    status: primaryEnv.status === 'active' ? 'Operational' : primaryEnv.status,
+    company: req.session.company,
+    tools: primaryEnv.tools || [],
     dashboards: ['Overview', 'Performance', 'Logs', 'Alerts'],
     services: ['API Server', 'Database', 'Cache', 'Queue'],
-    status: 'Operational',
-    uptime: '99.9%'
+    uptime: '99.9%',
+    createdAt: primaryEnv.createdAt,
+    updatedAt: primaryEnv.updatedAt
   };
 
   res.json(environmentDetails);
@@ -209,6 +220,11 @@ app.post('/api/users', auth.isAuthenticated, auth.isAdmin, (req, res) => {
     return res.status(409).json({ error: 'Username already exists' });
   }
 
+  const existingEmail = userDb.findByEmail(email);
+  if (existingEmail) {
+    return res.status(409).json({ error: 'Email already exists' });
+  }
+
   const newUser = userDb.createUser({
     username,
     email,
@@ -217,8 +233,23 @@ app.post('/api/users', auth.isAuthenticated, auth.isAdmin, (req, res) => {
     role
   });
 
+  // Automatically create isolated environment for new customer
+  if (role === 'customer') {
+    const environmentName = `${company} - Customer Environment`;
+    const environmentDescription = `Dedicated environment for ${company}. Upload automation tools and reports here.`;
+    
+    envDb.createEnvironment({
+      userId: newUser.id,
+      name: environmentName,
+      description: environmentDescription,
+      status: 'active'
+    });
+    
+    userDb.logActivity(req.session.userId, 'create_environment', `Auto-created environment for new user: ${username}`);
+  }
+
   // Log activity
-  userDb.logActivity(req.session.userId, 'create_user', `Created user: ${username}`);
+  userDb.logActivity(req.session.userId, 'create_user', `Created user: ${username} (${email})`);
 
   res.status(201).json({
     success: true,

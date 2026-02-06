@@ -35,20 +35,38 @@ async function loadEnvironmentDetails() {
  */
 function displayEnvironmentDetails(env) {
     // Environment info
-    document.getElementById('envName').textContent = env.environment;
+    document.getElementById('envName').textContent = env.name || env.environment;
     document.getElementById('envCompany').textContent = env.company;
     document.getElementById('envStatus').textContent = env.status;
     document.getElementById('envUptime').textContent = env.uptime;
 
     // Services list
     const servicesList = document.getElementById('servicesList');
-    servicesList.innerHTML = env.services.map(service => 
-        `<li>✓ ${service}</li>`
-    ).join('');
+    if (servicesList) {
+        servicesList.innerHTML = env.services.map(service => 
+            `<li>✓ ${service}</li>`
+        ).join('');
+    }
 
     // Dashboards list
     const dashboardsList = document.getElementById('dashboardsList');
-    dashboardsList.innerHTML = env.dashboards.map(dashboard => 
-        `<li><a href="#">${dashboard}</a></li>`
-    ).join('');
+    if (dashboardsList) {
+        dashboardsList.innerHTML = env.dashboards.map(dashboard => 
+            `<li><a href="#">${dashboard}</a></li>`
+        ).join('');
+    }
+    
+    // Tools list (if available)
+    const toolsElement = document.getElementById('envTools');
+    if (toolsElement && env.tools) {
+        if (env.tools.length > 0) {
+            toolsElement.innerHTML = env.tools.map(tool => 
+                `<div style="padding: 0.75rem; background: rgba(0,212,255,0.1); border-radius: 6px; margin-bottom: 0.5rem; border-left: 3px solid var(--primary-color);">
+                    <strong style="color: var(--primary-color);">🔧 ${tool}</strong>
+                </div>`
+            ).join('');
+        } else {
+            toolsElement.innerHTML = '<p style="color: var(--text-light);">Geen tools geïnstalleerd. Neem contact op met uw beheerder om tools toe te voegen.</p>';
+        }
+    }
 }

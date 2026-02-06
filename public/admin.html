@@ -226,40 +226,46 @@
     <div id="addUserModal" class="modal" style="display: none;">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h2>Add New User</h2>
+            <h2>Nieuwe Gebruiker Toevoegen</h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                ⚠️ Voor klanten wordt automatisch een geïsoleerde omgeving aangemaakt waar niemand anders toegang toe heeft.
+            </p>
             <form id="addUserForm" class="form">
                 <div class="form-group">
-                    <label for="newUsername">Username</label>
-                    <input type="text" id="newUsername" required>
+                    <label for="newEmail">Email (Login Credentials) *</label>
+                    <input type="email" id="newEmail" required placeholder="naam@bedrijf.com">
+                    <small class="hint">Dit email wordt gebruikt om in te loggen</small>
                 </div>
                 <div class="form-group">
-                    <label for="newEmail">Email</label>
-                    <input type="email" id="newEmail" required>
+                    <label for="newPassword">Wachtwoord *</label>
+                    <input type="password" id="newPassword" required placeholder="Minimaal 8 karakters">
+                    <small class="hint">Zorg voor een sterk wachtwoord</small>
                 </div>
                 <div class="form-group">
-                    <label for="newPassword">Password</label>
-                    <input type="password" id="newPassword" required>
+                    <label for="newUsername">Gebruikersnaam *</label>
+                    <input type="text" id="newUsername" required placeholder="gebruikersnaam_bedrijf">
+                    <small class="hint">Unieke identifier voor deze gebruiker</small>
                 </div>
                 <div class="form-group">
-                    <label for="newCompany">Company</label>
-                    <input type="text" id="newCompany" required>
+                    <label for="newCompany">Bedrijfsnaam *</label>
+                    <input type="text" id="newCompany" required placeholder="Bedrijf B.V.">
                 </div>
                 <div class="form-group">
-                    <label for="newRole">Role</label>
+                    <label for="newRole">Rol</label>
                     <select id="newRole">
-                        <option value="customer">Customer</option>
-                        <option value="admin">Admin</option>
+                        <option value="customer" selected>Customer (Krijgt eigen omgeving)</option>
+                        <option value="admin">Admin (Volledige toegang)</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="newRedirectPath">Redirect Path After Login</label>
+                    <label for="newRedirectPath">Redirect Na Login</label>
                     <select id="newRedirectPath">
-                        <option value="/dashboard">Customer Dashboard</option>
+                        <option value="/dashboard" selected>Customer Dashboard</option>
                         <option value="/admin">Admin Panel</option>
                         <option value="/environment">Environment</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="submit" class="btn btn-primary btn-block">Gebruiker Aanmaken</button>
             </form>
         </div>
     </div>

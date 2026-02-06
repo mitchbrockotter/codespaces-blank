@@ -166,15 +166,27 @@ function setupAddUserModal() {
             });
 
             if (response.ok) {
-                alert('User created successfully!');
+                const result = await response.json();
+                
+                let message = `✅ Gebruiker succesvol aangemaakt!\n\n`;
+                message += `Email: ${newUser.email}\n`;
+                message += `Wachtwoord: ${newUser.password}\n\n`;
+                
+                if (newUser.role === 'customer') {
+                    message += `🔐 Een geïsoleerde omgeving is automatisch aangemaakt.\n`;
+                    message += `Deze gebruiker kan alleen zijn/haar eigen omgeving zien.`;
+                }
+                
+                alert(message);
                 form.reset();
                 modal.style.display = 'none';
                 await loadUsers();
                 await loadStats();
                 await loadActivityLog();
+                await loadEnvironments(); // Refresh environments list
             } else {
                 const error = await response.json();
-                alert('Error: ' + error.error);
+                alert('Fout: ' + error.error);
             }
         } catch (error) {
             console.error('Error creating user:', error);

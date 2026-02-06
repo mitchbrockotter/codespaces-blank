@@ -66,6 +66,13 @@ function findByUsername(username) {
 }
 
 /**
+ * Find user by email
+ */
+function findByEmail(email) {
+  return users.find(u => u.email === email);
+}
+
+/**
  * Find user by ID
  */
 function findById(id) {
@@ -80,10 +87,15 @@ function verifyPassword(plainPassword, hashedPassword) {
 }
 
 /**
- * Authenticate user
+ * Authenticate user - accepts username or email
  */
-function authenticateUser(username, password) {
-  const user = findByUsername(username);
+function authenticateUser(usernameOrEmail, password) {
+  // Try to find by username first, then by email
+  let user = findByUsername(usernameOrEmail);
+  if (!user) {
+    user = findByEmail(usernameOrEmail);
+  }
+  
   if (!user) {
     return null;
   }
@@ -264,6 +276,7 @@ function updateUserLastLogin(userId) {
 
 module.exports = {
   findByUsername,
+  findByEmail,
   findById,
   verifyPassword,
   authenticateUser,
