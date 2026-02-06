@@ -260,11 +260,11 @@ code {
     background: transparent;
     position: relative;
     color: white;
-    padding: 8rem 2rem;
+    padding: 2rem 2rem;
     text-align: center;
     min-height: 600px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     overflow: hidden;
     z-index: 2;
@@ -321,7 +321,7 @@ code {
     height: 560px;
     width: auto;
     object-fit: contain;
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     filter: drop-shadow(0 20px 50px rgba(0, 212, 255, 0.6));
     animation: pulse 2s ease-in-out infinite;
 }
