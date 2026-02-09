@@ -8,6 +8,8 @@ if (typeof API_BASE === 'undefined') {
 }
 function apiPath(path){ return API_BASE + path; }
 
+const APP_BASE = (window.APP_BASE || '').replace(/\/$/, '');
+
 // Handle login button click
 console.log('🔍 Looking for loginBtn...');
 const loginBtn = document.getElementById('loginBtn');
@@ -66,8 +68,13 @@ if (loginBtn) {
             localStorage.setItem('redirectPath', data.redirect);
             console.log('💾 User stored in localStorage');
             
-            // Redirect immediately
-            window.location.href = data.redirect;
+            // Redirect to Next.js app if configured, otherwise use legacy redirect
+            if (APP_BASE) {
+                const target = data.user.role === 'admin' ? '/admin' : '/app';
+                window.location.href = `${APP_BASE}${target}`;
+            } else {
+                window.location.href = data.redirect;
+            }
 
         } catch (error) {
             console.error('Login error:', error);
