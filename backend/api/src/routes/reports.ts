@@ -134,4 +134,67 @@ router.get("/download/:token", async (req, res, next) => {
   }
 });
 
+router.get("/summary", async (req, res, next) => {
+  try {
+    const tenantId = req.auth?.tenantId;
+    if (!tenantId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const settingsResult = await pool.query(
+      "SELECT ts.time_saved_minutes, ts.hourly_rate, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
+      [tenantId]
+    );
+    const settings = settingsResult.rows[0] ?? null;
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total_runs FROM jobs WHERE tenant_id = $1 AND status = 'done'",
+      [tenantId]
+    );
+    const totalRuns = countResult.rows[0]?.total_runs ?? 0;
+
+    const timeSavedMinutes = settings?.time_saved_minutes ?? null;
+    const hourlyRate = settings?.hourly_rate ? Number(settings.hourly_rate) : null;
+    const moneySaved =
+      timeSavedMinutes !== null && hourlyRate !== null
+        ? Number(((totalRuns * timeSavedMinutes) / 60) * hourlyRate)
+        : null;
+
+    return res.json({
+      toolName: settings?.jar_name ?? null,
+      totalRuns,
+      timeSavedMinutes,
+      hourlyRate,
+      moneySaved
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/usage", async (req, res, next) => {
+  try {
+    const tenantId = req.auth?.tenantId;
+    if (!tenantId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await pool.query(
+      "WITH days AS (\n" +
+        "  SELECT generate_series(date_trunc('day', now()) - interval '13 days', date_trunc('day', now()), interval '1 day') AS day\n" +
+        ")\n" +
+        "SELECT to_char(days.day, 'YYYY-MM-DD') AS day, COALESCE(COUNT(j.id), 0)::int AS runs\n" +
+        "FROM days\n" +
+        "LEFT JOIN jobs j ON j.tenant_id = $1 AND j.status = 'done' AND date_trunc('day', j.finished_at) = days.day\n" +
+        "GROUP BY days.day\n" +
+        "ORDER BY days.day",
+      [tenantId]
+    );
+
+    return res.json({ points: result.rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 export default router;

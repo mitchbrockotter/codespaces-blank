@@ -71,4 +71,14 @@ function displayEnvironmentDetails(env) {
             toolsElement.innerHTML = '<p style="color: var(--text-light);">Geen tools geïnstalleerd. Neem contact op met uw beheerder om tools toe te voegen.</p>';
         }
     }
+
+    const runsElement = document.getElementById('envRuns');
+    if (runsElement) {
+        runsElement.textContent = typeof env.runsCompleted === 'number' ? String(env.runsCompleted) : '-';
+    }
+
+    const savingsElement = document.getElementById('envSavings');
+    if (savingsElement) {
+        savingsElement.textContent = env.savingsDisplay || '-';
+    }
 }

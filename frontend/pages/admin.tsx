@@ -19,6 +19,19 @@ type Job = {
   filename?: string | null;
 };
 
+type SummaryResponse = {
+  toolName: string | null;
+  totalRuns: number;
+  timeSavedMinutes: number | null;
+  hourlyRate: number | null;
+  moneySaved: number | null;
+};
+
+type UsagePoint = {
+  day: string;
+  runs: number;
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = React.useState<ApiUser | null>(null);
@@ -40,6 +53,12 @@ export default function AdminPage() {
   const [activeTenantId, setActiveTenantId] = React.useState("");
   const [activeJarId, setActiveJarId] = React.useState("");
   const [jobsTenantId, setJobsTenantId] = React.useState("");
+  const [savingsTenantId, setSavingsTenantId] = React.useState("");
+  const [timeSavedMinutes, setTimeSavedMinutes] = React.useState("");
+  const [hourlyRate, setHourlyRate] = React.useState("");
+  const [summaryTenantId, setSummaryTenantId] = React.useState("");
+  const [summary, setSummary] = React.useState<SummaryResponse | null>(null);
+  const [usage, setUsage] = React.useState<UsagePoint[]>([]);
 
   React.useEffect(() => {
     apiRequest<{ user: ApiUser }>("/auth/me")
@@ -154,6 +173,35 @@ export default function AdminPage() {
   const refreshJobs = async (event: React.FormEvent) => {
     event.preventDefault();
     await loadJobs(jobsTenantId);
+  };
+
+  const updateSavings = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    try {
+      await apiRequest(`/admin/tenants/${savingsTenantId}/savings`, {
+        method: "POST",
+        body: JSON.stringify({
+          timeSavedMinutes: Number(timeSavedMinutes),
+          hourlyRate: Number(hourlyRate)
+        })
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const loadSummary = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    try {
+      const summaryData = await apiRequest<SummaryResponse>(`/admin/tenants/${summaryTenantId}/summary`);
+      const usageData = await apiRequest<{ points: UsagePoint[] }>(`/admin/tenants/${summaryTenantId}/usage`);
+      setSummary(summaryData);
+      setUsage(usageData.points);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   return (
@@ -299,6 +347,91 @@ export default function AdminPage() {
                   #{job.id} {job.status} {job.filename ? `— ${job.filename}` : ""}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <h3>Usage savings model</h3>
+          <p className="status">
+            Configure the estimated minutes saved per run and the hourly rate for a tenant.
+          </p>
+          <form className="stack" onSubmit={updateSavings}>
+            <input
+              className="input"
+              placeholder="Tenant ID"
+              value={savingsTenantId}
+              onChange={(event) => setSavingsTenantId(event.target.value)}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Minutes saved per run"
+              value={timeSavedMinutes}
+              onChange={(event) => setTimeSavedMinutes(event.target.value)}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Hourly rate (EUR)"
+              value={hourlyRate}
+              onChange={(event) => setHourlyRate(event.target.value)}
+              required
+            />
+            <button className="button" type="submit">
+              Save savings model
+            </button>
+          </form>
+        </div>
+
+        <div className="card">
+          <h3>Tenant usage summary</h3>
+          <form className="stack" onSubmit={loadSummary}>
+            <input
+              className="input"
+              placeholder="Tenant ID"
+              value={summaryTenantId}
+              onChange={(event) => setSummaryTenantId(event.target.value)}
+              required
+            />
+            <button className="button" type="submit">
+              Load summary
+            </button>
+          </form>
+          {summary && (
+            <div className="stack" style={{ marginTop: 12 }}>
+              <div className="status">Tool: {summary.toolName ?? "Report generator"}</div>
+              <div className="status">Runs completed: {summary.totalRuns}</div>
+              <div className="status">
+                Savings model: {summary.timeSavedMinutes ?? "-"} min/run · {summary.hourlyRate ?? "-"} EUR/hr
+              </div>
+              <div className="status">
+                Estimated saved: {summary.moneySaved !== null ? `EUR ${summary.moneySaved.toFixed(2)}` : "-"}
+              </div>
+            </div>
+          )}
+          {usage.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="status" style={{ marginBottom: 8 }}>Last 14 days usage</div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${usage.length}, 1fr)`, gap: 6, alignItems: "end", height: 120 }}>
+                {usage.map((point) => {
+                  const maxRuns = usage.reduce((max, p) => Math.max(max, p.runs), 0);
+                  return (
+                    <div key={point.day} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                      <div
+                        style={{
+                          width: "100%",
+                          height: maxRuns > 0 ? `${Math.max(8, Math.round((point.runs / maxRuns) * 100))}%` : "8%",
+                          background: "rgba(215, 100, 65, 0.6)",
+                          borderRadius: 6
+                        }}
+                        title={`${point.day}: ${point.runs} runs`}
+                      />
+                      <div style={{ fontSize: 10, color: "#6b6f6c" }}>{point.day.slice(5)}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

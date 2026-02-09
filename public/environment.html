@@ -34,8 +34,8 @@
 
         <main class="dashboard-content">
             <div class="content-header">
-                <h1>Your Backend Environment</h1>
-                <p>Manage and monitor your dedicated environment</p>
+                <h1>Your Report Environment</h1>
+                <p>Access the automation tool you have been granted for this environment</p>
             </div>
 
             <div class="dashboard-grid">
@@ -62,37 +62,33 @@
                 </div>
 
                 <div class="dashboard-card">
-                    <h3>🔧 Services</h3>
-                    <div class="card-content">
-                        <ul id="servicesList" class="services-list">
-                            <li>Loading...</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="dashboard-card">
-                    <h3>📊 Dashboards</h3>
-                    <div class="card-content">
-                        <ul id="dashboardsList" class="dashboards-list">
-                            <li>Loading...</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="dashboard-card">
-                    <h3>�️ Geïnstalleerde Tools</h3>
+                    <h3>🔧 Your Tool</h3>
                     <div class="card-content" id="envTools">
-                        <p style="color: var(--text-light);">Laden...</p>
+                        <p class="info-value" style="margin-bottom: 0.75rem;">Report Generator</p>
+                        <p style="color: var(--text-light); margin-bottom: 1rem;">Generate a fresh report on demand.</p>
+                        <a href="/app" class="btn btn-primary" style="display: inline-block;">Generate report</a>
                     </div>
                 </div>
 
                 <div class="dashboard-card">
-                    <h3>�🔐 Quick Links</h3>
+                    <h3>📊 Usage overview</h3>
                     <div class="card-content">
-                        <a href="#" class="link-button">View Logs</a>
-                        <a href="#" class="link-button">Configure Service</a>
-                        <a href="#" class="link-button">Download Report</a>
-                        <a href="#" class="link-button">Request Support</a>
+                        <div class="info-row">
+                            <span class="info-label">Runs completed:</span>
+                            <span id="envRuns" class="info-value">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Estimated savings:</span>
+                            <span id="envSavings" class="info-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+                    <h3>🔐 Quick Links</h3>
+                    <div class="card-content">
+                        <a href="/app" class="link-button">Open report tool</a>
+                        <a href="#" class="link-button">Request support</a>
                     </div>
                 </div>
             </div>

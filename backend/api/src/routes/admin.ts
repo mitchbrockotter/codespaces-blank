@@ -121,6 +121,11 @@ const activeJarSchema = z.object({
   jarId: z.coerce.number().int()
 });
 
+const savingsSchema = z.object({
+  timeSavedMinutes: z.coerce.number().int().min(0),
+  hourlyRate: z.coerce.number().min(0)
+});
+
 router.post("/tenants/:tenantId/active-jar", async (req, res, next) => {
   try {
     const tenantId = Number(req.params.tenantId);
@@ -130,6 +135,21 @@ router.post("/tenants/:tenantId/active-jar", async (req, res, next) => {
       [tenantId, jarId]
     );
     auditLog("active_jar_set", { tenantId, jarId, actorId: req.auth?.id });
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/tenants/:tenantId/savings", async (req, res, next) => {
+  try {
+    const tenantId = Number(req.params.tenantId);
+    const { timeSavedMinutes, hourlyRate } = savingsSchema.parse(req.body);
+    await pool.query(
+      "INSERT INTO tenant_settings (tenant_id, time_saved_minutes, hourly_rate, updated_at) VALUES ($1, $2, $3, now()) ON CONFLICT (tenant_id) DO UPDATE SET time_saved_minutes = $2, hourly_rate = $3, updated_at = now()",
+      [tenantId, timeSavedMinutes, hourlyRate]
+    );
+    auditLog("savings_updated", { tenantId, timeSavedMinutes, hourlyRate, actorId: req.auth?.id });
     return res.json({ ok: true });
   } catch (error) {
     return next(error);
@@ -147,6 +167,61 @@ router.get("/jobs", async (req, res, next) => {
       [tenantId]
     );
     return res.json({ jobs: result.rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tenants/:tenantId/summary", async (req, res, next) => {
+  try {
+    const tenantId = Number(req.params.tenantId);
+    const settingsResult = await pool.query(
+      "SELECT ts.time_saved_minutes, ts.hourly_rate, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
+      [tenantId]
+    );
+    const settings = settingsResult.rows[0] ?? null;
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total_runs FROM jobs WHERE tenant_id = $1 AND status = 'done'",
+      [tenantId]
+    );
+    const totalRuns = countResult.rows[0]?.total_runs ?? 0;
+
+    const timeSavedMinutes = settings?.time_saved_minutes ?? null;
+    const hourlyRate = settings?.hourly_rate ? Number(settings.hourly_rate) : null;
+    const moneySaved =
+      timeSavedMinutes !== null && hourlyRate !== null
+        ? Number(((totalRuns * timeSavedMinutes) / 60) * hourlyRate)
+        : null;
+
+    return res.json({
+      toolName: settings?.jar_name ?? null,
+      totalRuns,
+      timeSavedMinutes,
+      hourlyRate,
+      moneySaved
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tenants/:tenantId/usage", async (req, res, next) => {
+  try {
+    const tenantId = Number(req.params.tenantId);
+    const result = await pool.query(
+      "WITH days AS (\n" +
+        "  SELECT generate_series(date_trunc('day', now()) - interval '13 days', date_trunc('day', now()), interval '1 day') AS day\n" +
+        ")\n" +
+        "SELECT to_char(days.day, 'YYYY-MM-DD') AS day, COALESCE(COUNT(j.id), 0)::int AS runs\n" +
+        "FROM days\n" +
+        "LEFT JOIN jobs j ON j.tenant_id = $1 AND j.status = 'done' AND date_trunc('day', j.finished_at) = days.day\n" +
+        "GROUP BY days.day\n" +
+        "ORDER BY days.day",
+      [tenantId]
+    );
+
+    return res.json({ points: result.rows });
   } catch (error) {
     return next(error);
   }
