@@ -7,4 +7,4 @@ window.API_BASE = 'https://codespaces-blank-production-8e1d.up.railway.app';
 // Optional: set to your Next.js app base URL to redirect users to the new UI.
 // Example: window.APP_BASE = 'https://your-vercel-app.vercel.app';
 // Leave empty to keep redirects on the legacy site.
-window.APP_BASE = 'https://pkba.nl';
+window.APP_BASE = 'https://codespaces-blank-i9m8-git-main-pkbas-projects.vercel.app';
