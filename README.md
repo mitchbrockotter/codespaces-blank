@@ -1,177 +1,120 @@
-# P&K Backend Automation - Customer Portal
+# pkba.nl Generate Report Platform
 
-A modern web application for P&K Backend Automation that provides customer account management and dashboard functionality with role-based access control.
+Multi-tenant, role-based report generation for pkba.nl. Users can only generate and download their own tenant reports. Admins manage tenants, users, and jars.
 
-## Features
-
-✅ **Company Branding** - Front page featuring "P&K Backend Automation"
-✅ **Customer Login** - Secure authentication system with session management
-✅ **Role-Based Access** - Different pages for customers vs. admin users
-✅ **User Management** - Admin panel for creating and managing users
-✅ **Environment Management** - Customer-specific environment dashboards
-✅ **Responsive Design** - Works on desktop, tablet, and mobile devices
-
-## Project Structure
+## Structure
 
 ```
-├── public/                    # Frontend files
-│   ├── index.html            # Home page
-│   ├── login.html            # Login page
-│   ├── dashboard.html        # Customer dashboard
-│   ├── admin.html            # Admin panel
-│   ├── environment.html      # Environment details
-│   ├── 404.html              # Error page
-│   ├── css/
-│   │   └── style.css         # Styling
-│   └── js/
-│       ├── auth.js           # Authentication logic
-│       ├── dashboard.js      # Dashboard functionality
-│       ├── admin.js          # Admin panel functionality
-│       └── environment.js    # Environment page logic
-├── src/
-│   └── users/
-│       ├── userDatabase.js   # User storage & management
-│       └── auth.js           # Authentication middleware
-├── server.js                 # Express.js server
-├── package.json              # Node.js dependencies
-└── README.md                 # This file
+frontend/       Next.js (Vercel)
+backend/api/    Express API (Railway)
+backend/worker/ Worker/Runner (Railway)
+migrations/     Postgres SQL migrations
 ```
 
-## Installation
+## Key Security Properties
 
-1. Install dependencies:
-```bash
+- Tenant isolation is enforced server-side by deriving `tenant_id` from JWT only.
+- Every query includes `tenant_id` filters where applicable.
+- Reports are downloadable via single-use tokens that expire quickly.
+- JAR execution happens only in the worker service.
+- Cookies are `HttpOnly` with `SameSite=Strict` and origin checks for state-changing requests.
+
+## Local Development
+
+### 1) Database
+
+Create a Postgres database and apply migrations from [migrations/001_init.sql](migrations/001_init.sql).
+
+### 2) API
+
+```
+cd backend/api
+cp .env.example .env
 npm install
+npm run dev
 ```
 
-2. Start the server:
-```bash
-npm start
+### 3) Worker
+
+```
+cd backend/worker
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-The server will run on `http://localhost:3000`
+### 4) Frontend
 
-## Demo Credentials
+```
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
 
-### Customer Account
-- **Username:** acme_customer
-- **Password:** password123
+Frontend defaults to http://localhost:3001 and API defaults to http://localhost:4000.
 
-### Admin Account
-- **Username:** techstart_admin
-- **Password:** securepass456
+## Deployment
 
-## Features Overview
+### Vercel (Frontend)
 
-### Home Page
-- Company branding with "P&K Backend Automation"
-- Navigation menu with login link
-- Service showcase with 6 feature cards
-- Contact information
-- Responsive design
+Set env vars:
 
-### Authentication System
-- Secure login with password hashing (bcryptjs)
-- Session-based authentication (express-session)
-- Password verification and validation
-- Logout functionality
+- `NEXT_PUBLIC_API_BASE_URL=https://api.pkba.nl`
 
-### Customer Dashboard
-- Welcome message with company information
-- Environment status display
-- Recent activity log
-- Quick action buttons
-- Account information display
-- Responsive sidebar navigation
+### Railway (API)
 
-### Admin Panel
-- Complete user management system
-- User creation with role assignment
-- User details display in table format
-- System statistics and metrics
-- User count and active environments tracking
+Set env vars from [backend/api/.env.example](backend/api/.env.example).
 
-### Environment Page
-- View your dedicated environment details
-- Service list display
-- Available dashboards
-- Performance metrics (CPU, Memory, Disk usage)
-- Quick action links
+Start command:
 
-## API Endpoints
+```
+npm run start
+```
 
-### Authentication
-- `POST /api/login` - User login
-- `POST /api/logout` - User logout
-- `GET /api/user` - Get current user info
+### Railway (Worker)
 
-### User Management (Admin only)
-- `GET /api/users` - List all users
-- `POST /api/users` - Create new user
+Set env vars from [backend/worker/.env.example](backend/worker/.env.example).
 
-### Environment
-- `GET /api/environment` - Get environment details
+Start command:
 
-## User Roles
+```
+npm run start
+```
 
-### Customer
-- Access to dashboard
-- View own environment
-- Limited to personal resources
+### Object Storage
 
-### Admin
-- Full system access
-- User management
-- Can access dashboard and environment
-- Admin panel access
+Use AWS S3 or Cloudflare R2 with S3-compatible credentials. Ensure bucket permissions allow read/write by the services.
 
-## Security Features
+## API Summary
 
-- Password hashing with bcryptjs
-- Session-based authentication
-- Protected routes with middleware
-- Secure session cookies
-- CSRF protection ready
-- XSS protection through template rendering
+Auth:
 
-## Technologies Used
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
 
-- **Backend:** Node.js, Express.js
-- **Frontend:** HTML5, CSS3, Vanilla JavaScript
-- **Security:** bcryptjs, express-session
-- **Database:** In-memory (easily replaceable with MongoDB/PostgreSQL)
+Admin:
 
-## Customization
+- `POST /admin/tenants`
+- `GET /admin/tenants`
+- `POST /admin/users`
+- `POST /admin/jars`
+- `GET /admin/jars?tenantId=...`
+- `POST /admin/tenants/:tenantId/active-jar`
+- `GET /admin/jobs?tenantId=...`
 
-### Add a Real Database
-Replace the in-memory storage in `src/users/userDatabase.js` with MongoDB, PostgreSQL, or your preferred database.
+User:
 
-### Add More Users
-Edit the `users` array in `src/users/userDatabase.js` to add more demo accounts or connect to a database.
+- `POST /reports/run`
+- `GET /reports/jobs/:jobId`
+- `POST /reports/jobs/:jobId/download-token`
+- `GET /reports/download/:token`
 
-### Change Company Name
-Search for "P&K Backend Automation" throughout the HTML files to rebrand the entire application.
+## Worker Notes
 
-### Modify Port
-Change the `PORT` variable in `server.js` (default: 3000)
+The worker runs jar files in an isolated temp directory, with a strict timeout and no user-provided arguments. Each jar must output exactly one file into the temp directory. The newest file is taken as the report output.
 
-## Production Deployment
+## Legacy Files
 
-Before deploying to production:
-
-1. Set `secure: true` in session cookies (requires HTTPS)
-2. Use a real database instead of in-memory storage
-3. Set strong secret keys for sessions
-4. Enable CORS if needed
-5. Set proper environment variables
-6. Add rate limiting
-7. Implement proper error logging
-8. Use a production-grade web server (Nginx, Apache)
-
-## License
-
-© 2026 P&K Backend Automation. All rights reserved.
-
-## Support
-
-For support, contact: support@pkautomation.com
+The original static site remains under `public/` and `server.js` for reference, but the production system should use `frontend/` and `backend/`.
