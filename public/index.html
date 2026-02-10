@@ -19,7 +19,7 @@
                 <a href="/" class="nav-link">Home</a>
                 <a href="#features" class="nav-link">Features</a>
                 <a href="#contact" class="nav-link">Contact</a>
-                <a href="/login" class="nav-link nav-login">Customer Login</a>
+                <a href="/login" class="nav-link nav-login" data-login-link>Customer Login</a>
             </div>
         </div>
     </nav>
@@ -29,7 +29,7 @@
             <img src="/images/logo.png" alt="P&K Backend Automation Logo" class="hero-logo">
             <p>Streamline Your Backend Infrastructure Management</p>
             <p class="subtitle">Automated solutions for modern development environments</p>
-            <a href="/login" class="btn btn-primary btn-large">Login to Your Environment</a>
+            <a href="/login" class="btn btn-primary btn-large" data-login-link>Login to Your Environment</a>
         </div>
     </header>
 
@@ -91,5 +91,15 @@
     <footer class="footer">
         <p>&copy; 2026 P&K Backend Automation. All rights reserved.</p>
     </footer>
+
+    <script src="/env.js"></script>
+    <script>
+        const appBase = (window.APP_BASE || '').replace(/\/$/, '');
+        if (appBase) {
+            document.querySelectorAll('[data-login-link]').forEach((link) => {
+                link.setAttribute('href', `${appBase}/login`);
+            });
+        }
+    </script>
 </body>
 </html>
