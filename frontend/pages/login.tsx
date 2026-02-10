@@ -1,4 +1,5 @@
 import * as React from "react";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import { apiRequest } from "../lib/api";
 
@@ -38,40 +39,80 @@ export default function LoginPage() {
   };
 
   return (
-    <main>
-      <div className="brand">pkba.nl</div>
-      <div className="card" style={{ maxWidth: 480 }}>
-        <h2>Secure report portal</h2>
-        <p className="status">Sign in to generate your report.</p>
-        <form className="stack" onSubmit={onSubmit}>
-          <label className="label" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            className="input"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-          <label className="label" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            className="input"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-          {error && <div className="notice">{error}</div>}
-          <button className="button" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+    <>
+      <Head>
+        <title>Customer Login - P&K Backend Automation</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </Head>
+      <nav className="navbar">
+        <div className="navbar-container">
+          <div className="navbar-left">
+            <a href="/" className="navbar-brand">
+              <img src="/images/logo.png" alt="P&K Backend Automation Logo" className="navbar-logo" />
+              <span>P&K Backend Automation</span>
+            </a>
+          </div>
+          <div className="navbar-right">
+            <a href="/" className="nav-link">Home</a>
+            <a href="/login" className="nav-link nav-login active">Login</a>
+          </div>
+        </div>
+      </nav>
+
+      <div className="login-container">
+        <div className="login-box">
+          <h1>Customer Login</h1>
+          <p className="login-subtitle">Access your backend environment</p>
+
+          <form className="login-form" onSubmit={onSubmit}>
+            <div className="form-group">
+              <label htmlFor="email">Email of Gebruikersnaam</label>
+              <input
+                type="text"
+                id="email"
+                name="email"
+                required
+                placeholder="naam@bedrijf.com of gebruikersnaam"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <small className="hint">Vul je email of gebruikersnaam in</small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">Wachtwoord</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                placeholder="Vul je wachtwoord in"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+
+            {error && <div className="error-message" style={{ display: "block" }}>{error}</div>}
+
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? "Inloggen..." : "Inloggen"}
+            </button>
+          </form>
+
+          <div className="login-footer">
+            <p>Geen account? <a href="/">Neem contact op</a></p>
+          </div>
+        </div>
+
+        <div className="demo-credentials">
+          <h3>Demo Credentials</h3>
+          <p><strong>Customer Account:</strong></p>
+          <code>Email: contact@acmecorp.com<br />Wachtwoord: password123</code>
+
+          <p style={{ marginTop: 15 }}><strong>Admin Account:</strong></p>
+          <code>Email: admin@techstart.io<br />Wachtwoord: securepass456</code>
+        </div>
       </div>
-    </main>
+    </>
   );
 }
