@@ -130,6 +130,14 @@ router.post("/tenants/:tenantId/active-jar", async (req, res, next) => {
   try {
     const tenantId = Number(req.params.tenantId);
     const { jarId } = activeJarSchema.parse(req.body);
+    const jarResult = await pool.query("SELECT tenant_id FROM jars WHERE id = $1", [jarId]);
+    const jar = jarResult.rows[0];
+    if (!jar) {
+      return res.status(404).json({ error: "Jar not found" });
+    }
+    if (jar.tenant_id !== tenantId) {
+      return res.status(400).json({ error: "Jar does not belong to tenant" });
+    }
     await pool.query(
       "INSERT INTO tenant_settings (tenant_id, active_jar_id, updated_at) VALUES ($1, $2, now()) ON CONFLICT (tenant_id) DO UPDATE SET active_jar_id = $2, updated_at = now()",
       [tenantId, jarId]

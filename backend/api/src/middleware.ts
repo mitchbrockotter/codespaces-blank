@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { env } from "./env";
+import { env, getAllowedOrigins } from "./env";
 import { verifyJwt } from "./auth";
 import type { Role } from "./types";
 
@@ -34,7 +34,8 @@ export function enforceOrigin(req: Request, res: Response, next: NextFunction) {
     return next();
   }
   const origin = req.headers.origin;
-  if (origin && origin !== env.FRONTEND_ORIGIN) {
+  const allowedOrigins = getAllowedOrigins();
+  if (origin && !allowedOrigins.includes(origin)) {
     return res.status(403).json({ error: "Invalid origin" });
   }
   return next();

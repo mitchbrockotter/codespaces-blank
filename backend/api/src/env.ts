@@ -7,6 +7,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   FRONTEND_ORIGIN: z.string().url(),
+  FRONTEND_ORIGINS: z.string().optional(),
   JWT_SECRET: z.string().min(10),
   COOKIE_NAME: z.string().default("pkba_session"),
   DATABASE_URL: z.string().min(1),
@@ -24,3 +25,10 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+
+export function getAllowedOrigins(): string[] {
+  const extra = env.FRONTEND_ORIGINS
+    ? env.FRONTEND_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean)
+    : [];
+  return Array.from(new Set([env.FRONTEND_ORIGIN, ...extra]));
+}

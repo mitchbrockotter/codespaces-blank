@@ -66,17 +66,17 @@ export default function LoginPage() {
 
           <form className="login-form" onSubmit={onSubmit}>
             <div className="form-group">
-              <label htmlFor="email">Email of Gebruikersnaam</label>
+              <label htmlFor="email">Email</label>
               <input
                 type="text"
                 id="email"
                 name="email"
                 required
-                placeholder="naam@bedrijf.com of gebruikersnaam"
+                placeholder="naam@bedrijf.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-              <small className="hint">Vul je email of gebruikersnaam in</small>
+              <small className="hint">Vul je email in</small>
             </div>
 
             <div className="form-group">
@@ -104,14 +104,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="demo-credentials">
-          <h3>Demo Credentials</h3>
-          <p><strong>Customer Account:</strong></p>
-          <code>Email: contact@acmecorp.com<br />Wachtwoord: password123</code>
+        {process.env.NODE_ENV !== "production" && (
+          <div className="demo-credentials">
+            <h3>Demo Credentials</h3>
+            <p><strong>Customer Account:</strong></p>
+            <code>Email: contact@acmecorp.com<br />Wachtwoord: password123</code>
 
-          <p style={{ marginTop: 15 }}><strong>Admin Account:</strong></p>
-          <code>Email: admin@techstart.io<br />Wachtwoord: securepass456</code>
-        </div>
+            <p style={{ marginTop: 15 }}><strong>Admin Account:</strong></p>
+            <code>Email: admin@techstart.io<br />Wachtwoord: securepass456</code>
+          </div>
+        )}
       </div>
     </>
   );

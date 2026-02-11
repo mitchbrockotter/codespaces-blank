@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { env } from "./env";
+import { env, getAllowedOrigins } from "./env";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import reportRoutes from "./routes/reports";
@@ -39,9 +39,16 @@ app.use((req, res, next) => {
   return next();
 });
 
+const allowedOrigins = getAllowedOrigins();
+
 app.use(
   cors({
-    origin: env.FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],

@@ -37,10 +37,11 @@ router.post("/login", async (req, res, next) => {
       role: user.role
     });
 
+    const isProd = env.NODE_ENV === "production";
     res.cookie(env.COOKIE_NAME, token, {
       httpOnly: true,
-      sameSite: "strict",
-      secure: env.NODE_ENV === "production",
+      sameSite: isProd ? "none" : "lax",
+      secure: isProd,
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
@@ -58,10 +59,11 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.post("/logout", (req, res) => {
+  const isProd = env.NODE_ENV === "production";
   res.clearCookie(env.COOKIE_NAME, {
     httpOnly: true,
-    sameSite: "strict",
-    secure: env.NODE_ENV === "production"
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd
   });
   return res.json({ ok: true });
 });
