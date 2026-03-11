@@ -86,7 +86,7 @@ export default function Home() {
       </section>
 
       <footer className="footer">
-        <p>&copy; 2026 P&K Backend Automation. All rights reserved.</p>
+        <p>&copy; 2026 P&K Backend Automation. All rights reserved. KvK: 99874776</p>
       </footer>
     </>
   );
