@@ -76,10 +76,7 @@ export default function Home() {
           <h2>Get in Touch</h2>
           <div className="contact-info">
             <div className="contact-item">
-              <strong>Email:</strong> support@pkautomation.com
-            </div>
-            <div className="contact-item">
-              <strong>Phone:</strong> +1 (555) 123-4567
+              <strong>Email:</strong> PKBackendAutomation@outlook.com
             </div>
             <div className="contact-item">
               <strong>Hours:</strong> 24/7 Support Available
