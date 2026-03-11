@@ -9,54 +9,25 @@ const bcryptjs = require('bcryptjs');
 let users = [
   {
     id: 1,
-    username: 'acme_customer',
-    email: 'contact@acmecorp.com',
-    password: bcryptjs.hashSync('password123', 10), // Pre-hashed
-    company: 'ACME Corporation',
-    role: 'customer',
-    environment: 'acme-prod',
-    redirectPath: '/dashboard',
-    status: 'active',
-    createdAt: new Date('2026-01-15'),
-    lastLogin: new Date('2026-02-05 14:30:00')
-  },
-  {
-    id: 2,
-    username: 'techstart_admin',
-    email: 'admin@techstart.io',
-    password: bcryptjs.hashSync('securepass456', 10),
-    company: 'TechStart Inc',
+    username: 'pkba_admin',
+    email: 'admin@pkba.nl',
+    password: bcryptjs.hashSync('Pkbabeheer1!', 10),
+    company: 'P&K Backend Automation',
     role: 'admin',
-    environment: 'techstart-dev',
+    environment: 'pkba-admin',
     redirectPath: '/admin',
     status: 'active',
-    createdAt: new Date('2026-01-01'),
-    lastLogin: new Date('2026-02-06 09:15:00')
-  },
-  {
-    id: 3,
-    username: 'innovate_user',
-    email: 'ops@innovate.com',
-    password: bcryptjs.hashSync('innovate789', 10),
-    company: 'Innovate Solutions',
-    role: 'customer',
-    environment: 'innovate-staging',
-    redirectPath: '/dashboard',
-    status: 'active',
-    createdAt: new Date('2026-01-20'),
-    lastLogin: new Date('2026-02-04 11:00:00')
+    createdAt: new Date('2026-03-11'),
+    lastLogin: null
   }
 ];
 
 // Activity log
 let activityLog = [
-  { id: 1, userId: 1, action: 'login', timestamp: new Date('2026-02-05 14:30:00'), details: 'Customer login' },
-  { id: 2, userId: 2, action: 'view_users', timestamp: new Date('2026-02-06 09:15:00'), details: 'Viewed user list' },
-  { id: 3, userId: 1, action: 'view_environment', timestamp: new Date('2026-02-05 14:45:00'), details: 'Accessed environment' },
-  { id: 4, userId: 2, action: 'create_user', timestamp: new Date('2026-02-01 10:00:00'), details: 'Created new user: innovate_user' }
+  { id: 1, userId: 1, action: 'system_init', timestamp: new Date('2026-03-11'), details: 'Initialized admin account' }
 ];
 
-let activityLogId = 5;
+let activityLogId = 2;
 
 /**
  * Find user by username

@@ -34,7 +34,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-User-Role'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Set-Cookie'],
   maxAge: 86400
 }));
@@ -114,7 +114,7 @@ app.get('/login', (req, res) => {
  * Dashboard (Protected - Customer & Admin)
  * Frontend checks localStorage for authentication
  */
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', auth.isAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
@@ -122,7 +122,7 @@ app.get('/dashboard', (req, res) => {
  * Admin Panel (Protected - Admin only)
  * Frontend checks localStorage for authentication
  */
-app.get('/admin', (req, res) => {
+app.get('/admin', auth.isAuthenticated, auth.isAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
@@ -130,7 +130,7 @@ app.get('/admin', (req, res) => {
  * User Environment (Protected - Customer & Admin)
  * Frontend checks localStorage for authentication
  */
-app.get('/environment', (req, res) => {
+app.get('/environment', auth.isAuthenticated, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'environment.html'));
 });
 

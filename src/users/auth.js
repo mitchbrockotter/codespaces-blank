@@ -1,7 +1,7 @@
 /**
  * Authentication Middleware
  * Handles user session verification and authorization
- * Accepts both server session and custom headers (for cross-domain auth)
+ * Uses server sessions only (no client-supplied auth headers).
  */
 
 /**
@@ -10,18 +10,6 @@
 function isAuthenticated(req, res, next) {
   // Check session first
   if (req.session && req.session.userId) {
-    return next();
-  }
-  
-  // Check custom headers (from localStorage frontend auth)
-  const userId = req.headers['x-user-id'];
-  const role = req.headers['x-user-role'];
-  if (userId) {
-    req.session = req.session || {};
-    req.session.userId = parseInt(userId);
-    if (role) {
-      req.session.role = role;
-    }
     return next();
   }
   
@@ -39,16 +27,6 @@ function isAuthenticated(req, res, next) {
 function isAdmin(req, res, next) {
   // Check session first
   if (req.session && req.session.userId && req.session.role === 'admin') {
-    return next();
-  }
-  
-  // Check custom headers (from localStorage frontend auth)
-  const userId = req.headers['x-user-id'];
-  const role = req.headers['x-user-role'];
-  if (userId && role === 'admin') {
-    req.session = req.session || {};
-    req.session.userId = parseInt(userId);
-    req.session.role = role;
     return next();
   }
   

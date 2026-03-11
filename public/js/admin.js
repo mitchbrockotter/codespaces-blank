@@ -9,36 +9,12 @@ if (typeof API_BASE === 'undefined') {
 function apiPath(path){ return API_BASE + path; }
 
 /**
- * Helper function to add auth headers from localStorage to API requests
- */
-function getAuthHeaders() {
-    const userJson = localStorage.getItem('user');
-    const headers = {};
-    if (userJson) {
-        try {
-            const user = JSON.parse(userJson);
-            headers['X-User-Id'] = user.id;
-            headers['X-User-Role'] = user.role;
-        } catch (e) {
-            console.error('Error parsing user from localStorage:', e);
-        }
-    }
-    return headers;
-}
-
-/**
- * Wrapper for fetch that automatically adds auth headers
+ * Wrapper for fetch that relies on session cookies.
  */
 async function apiCall(path, options = {}) {
-    const headers = {
-        ...getAuthHeaders(),
-        ...options.headers
-    };
-    
     return fetch(apiPath(path), {
         ...options,
-        credentials: 'include',
-        headers
+        credentials: 'include'
     });
 }
 

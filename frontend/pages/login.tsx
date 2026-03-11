@@ -104,16 +104,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {process.env.NODE_ENV !== "production" && (
-          <div className="demo-credentials">
-            <h3>Demo Credentials</h3>
-            <p><strong>Customer Account:</strong></p>
-            <code>Email: contact@acmecorp.com<br />Wachtwoord: password123</code>
-
-            <p style={{ marginTop: 15 }}><strong>Admin Account:</strong></p>
-            <code>Email: admin@techstart.io<br />Wachtwoord: securepass456</code>
-          </div>
-        )}
       </div>
     </>
   );
