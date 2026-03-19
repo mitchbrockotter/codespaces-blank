@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - P&K Backend Automation</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-left">
+                <a href="/" class="navbar-brand">
+                    <img src="/images/logo.png" alt="P&K Backend Automation Logo" class="navbar-logo">
+                    <span>P&K Backend Automation</span>
+                </a>
+            </div>
+            <div class="navbar-right">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/#features" class="nav-link">Features</a>
+                <a href="/contact" class="nav-link nav-login active">Contact</a>
+                <a href="/login" class="nav-link">Customer Login</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="contact-page-container">
+        <section class="contact-form-panel">
+            <h1>Contact Opnemen</h1>
+            <p class="contact-page-subtitle">Stuur ons een bericht. Wij bevestigen uw aanvraag direct per e-mail.</p>
+
+            <form id="contactForm" class="contact-form" novalidate>
+                <div class="honeypot-wrap" aria-hidden="true">
+                    <label for="contactWebsite">Website</label>
+                    <input type="text" id="contactWebsite" name="website" tabindex="-1" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactName">Naam</label>
+                    <input type="text" id="contactName" name="name" required maxlength="120" placeholder="Uw volledige naam">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactEmail">E-mailadres</label>
+                    <input type="email" id="contactEmail" name="email" required maxlength="150" placeholder="naam@bedrijf.nl">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactSubject">Onderwerp</label>
+                    <input type="text" id="contactSubject" name="subject" required maxlength="200" placeholder="Waar gaat uw vraag over?">
+                </div>
+
+                <div class="form-group">
+                    <label for="contactMessage">Bericht</label>
+                    <textarea id="contactMessage" name="emailText" rows="7" required maxlength="5000" placeholder="Schrijf hier uw bericht"></textarea>
+                </div>
+
+                <div id="contactError" class="error-message" style="display: none;"></div>
+                <div id="contactSuccess" class="success-message" style="display: none;"></div>
+
+                <button type="submit" id="contactSubmit" class="btn btn-primary btn-block">Verzenden</button>
+            </form>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2026 P&K Backend Automation. All rights reserved. KvK: 99874776</p>
+    </footer>
+
+    <script src="/env.js"></script>
+    <script src="/js/contact.js"></script>
+</body>
+</html>

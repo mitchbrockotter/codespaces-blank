@@ -18,7 +18,7 @@ export default function Home() {
           <div className="navbar-right">
             <a href="/" className="nav-link">Home</a>
             <a href="#features" className="nav-link">Features</a>
-            <a href="#contact" className="nav-link">Contact</a>
+            <a href="/contact" className="nav-link">Contact</a>
             <a href="/login" className="nav-link nav-login">Customer Login</a>
           </div>
         </div>

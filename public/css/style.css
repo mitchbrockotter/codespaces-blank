@@ -617,6 +617,16 @@ code {
     animation: shake 0.4s ease-in-out;
 }
 
+.success-message {
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(0, 208, 132, 0.15) 0%, rgba(0, 208, 132, 0.05) 100%);
+    border: 1px solid var(--success-color);
+    border-radius: 8px;
+    color: #84f2c7;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+}
+
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
@@ -696,6 +706,51 @@ code {
     margin-bottom: 1rem;
     border: 1px solid var(--border-color);
     font-size: 0.9rem;
+}
+
+/* ===== Contact Page ===== */
+.contact-page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    min-height: calc(100vh - 220px);
+}
+
+.contact-form-panel {
+    background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 42, 74, 0.5) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 2.5rem;
+    box-shadow: 0 12px 32px rgba(0, 212, 255, 0.12);
+    backdrop-filter: blur(10px);
+}
+
+.contact-form-panel h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.6rem;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.contact-page-subtitle {
+    color: var(--text-light);
+    margin-bottom: 2rem;
+    font-size: 1.05rem;
+}
+
+.contact-form textarea {
+    resize: vertical;
+    min-height: 180px;
+}
+
+.honeypot-wrap {
+    position: absolute;
+    left: -5000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
 }
 
 /* ===== Dashboard ===== */
@@ -1270,6 +1325,18 @@ code {
         max-width: 100%;
     }
 
+    .contact-page-container {
+        padding: 1.25rem 1rem;
+    }
+
+    .contact-form-panel {
+        padding: 1.5rem;
+    }
+
+    .contact-form-panel h1 {
+        font-size: 1.7rem;
+    }
+
     .login-box h1 {
         font-size: 1.5rem;
     }
@@ -1442,6 +1509,14 @@ code {
 
     .login-box {
         padding: 1rem;
+    }
+
+    .contact-form-panel {
+        padding: 1rem;
+    }
+
+    .contact-form-panel h1 {
+        font-size: 1.4rem;
     }
 
     .login-box h1 {

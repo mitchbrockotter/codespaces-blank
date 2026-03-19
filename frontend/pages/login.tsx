@@ -100,7 +100,7 @@ export default function LoginPage() {
           </form>
 
           <div className="login-footer">
-            <p>Geen account? <a href="/">Neem contact op</a></p>
+            <p>Geen account? <a href="/contact">Neem contact op</a></p>
           </div>
         </div>
 

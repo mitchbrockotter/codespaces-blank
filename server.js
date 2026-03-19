@@ -8,12 +8,63 @@ const session = require('express-session');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const userDb = require('./src/users/userDatabase');
 const auth = require('./src/users/auth');
 const envDb = require('./src/environments/environmentDatabase');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CONTACT_RECIPIENT_EMAIL = 'pkbackendautomation@outlook.com';
+const CONTACT_RATE_LIMIT_WINDOW_MS = Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
+const CONTACT_RATE_LIMIT_MAX_REQUESTS = Number(process.env.CONTACT_RATE_LIMIT_MAX_REQUESTS || 5);
+const contactRateLimitStore = new Map();
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function createContactTransporter() {
+  const host = process.env.CONTACT_SMTP_HOST || 'smtp.office365.com';
+  const port = Number(process.env.CONTACT_SMTP_PORT || 587);
+  const secure = process.env.CONTACT_SMTP_SECURE === 'true';
+  const user = process.env.CONTACT_SMTP_USER;
+  const pass = process.env.CONTACT_SMTP_PASS;
+
+  if (!user || !pass) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user,
+      pass
+    }
+  });
+}
+
+function isContactRateLimited(ipAddress) {
+  const now = Date.now();
+  const cutoff = now - CONTACT_RATE_LIMIT_WINDOW_MS;
+  const requests = (contactRateLimitStore.get(ipAddress) || []).filter((timestamp) => timestamp > cutoff);
+
+  if (requests.length >= CONTACT_RATE_LIMIT_MAX_REQUESTS) {
+    contactRateLimitStore.set(ipAddress, requests);
+    return true;
+  }
+
+  requests.push(now);
+  contactRateLimitStore.set(ipAddress, requests);
+  return false;
+}
 
 // CORS - Allow frontend to connect from different domain
 const allowedOrigins = [
@@ -108,6 +159,13 @@ app.get('/login', (req, res) => {
     return res.redirect('/dashboard');
   }
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+/**
+ * Contact Page
+ */
+app.get('/contact', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'contact.html'));
 });
 
 /**
@@ -217,6 +275,99 @@ app.post('/api/logout', (req, res) => {
     }
     res.json({ success: true });
   });
+});
+
+/**
+ * Contact API
+ * POST /api/contact
+ */
+app.post('/api/contact', async (req, res) => {
+  const name = (req.body.name || '').trim();
+  const email = (req.body.email || '').trim();
+  const subject = (req.body.subject || '').trim();
+  const emailText = (req.body.emailText || '').trim();
+  const website = (req.body.website || '').trim();
+
+  // Honeypot field: bots often fill hidden fields; return success to avoid probing.
+  if (website) {
+    return res.json({
+      success: true,
+      message: 'Bedankt voor uw bericht. Wij nemen zo snel mogelijk contact met u op.'
+    });
+  }
+
+  if (isContactRateLimited(req.ip)) {
+    return res.status(429).json({
+      error: 'U heeft te veel berichten verstuurd in korte tijd. Probeert u het later opnieuw.'
+    });
+  }
+
+  if (!name || !email || !subject || !emailText) {
+    return res.status(400).json({ error: 'Vul alle verplichte velden in.' });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Vul een geldig e-mailadres in.' });
+  }
+
+  if (name.length > 120 || subject.length > 200 || emailText.length > 5000) {
+    return res.status(400).json({ error: 'Een of meer velden zijn te lang ingevuld.' });
+  }
+
+  const transporter = createContactTransporter();
+  const fromEmail = process.env.CONTACT_FROM_EMAIL || process.env.CONTACT_SMTP_USER;
+  const normalizedSubject = subject.replace(/[\r\n]+/g, ' ').trim();
+
+  if (!transporter || !fromEmail) {
+    console.error('Contact email configuration missing. Set CONTACT_SMTP_USER and CONTACT_SMTP_PASS.');
+    return res.status(500).json({ error: 'De e-mailservice is momenteel niet beschikbaar.' });
+  }
+
+  const escapedName = escapeHtml(name);
+  const escapedEmail = escapeHtml(email);
+  const escapedSubject = escapeHtml(subject);
+  const escapedMessage = escapeHtml(emailText).replace(/\n/g, '<br>');
+
+  const customerMail = {
+    from: `P&K Backend Automation <${fromEmail}>`,
+    to: email,
+    subject: 'Bedankt voor uw bericht aan P&K Backend Automation',
+    text: `Beste ${name},\n\nHartelijk dank voor uw bericht aan P&K Backend Automation. Wij hebben uw aanvraag in goede orde ontvangen en nemen zo spoedig mogelijk contact met u op.\n\nMet vriendelijke groet,\nP&K Backend Automation`,
+    html: `<p>Beste ${escapedName},</p><p>Hartelijk dank voor uw bericht aan P&K Backend Automation. Wij hebben uw aanvraag in goede orde ontvangen en nemen zo spoedig mogelijk contact met u op.</p><p>Met vriendelijke groet,<br>P&amp;K Backend Automation</p>`
+  };
+
+  const internalMail = {
+    from: `P&K Backend Automation <${fromEmail}>`,
+    to: CONTACT_RECIPIENT_EMAIL,
+    replyTo: email,
+    subject: `Nieuw contactformulier bericht: ${normalizedSubject}`,
+    text: `Nieuw contactformulier bericht\n\nNaam: ${name}\nE-mail: ${email}\nOnderwerp: ${normalizedSubject}\n\nBericht:\n${emailText}\n\nVerzonden op: ${new Date().toISOString()}\nIP-adres: ${req.ip}`,
+    html: `
+      <h2>Nieuw contactformulier bericht</h2>
+      <p><strong>Naam:</strong> ${escapedName}</p>
+      <p><strong>E-mail:</strong> ${escapedEmail}</p>
+      <p><strong>Onderwerp:</strong> ${escapedSubject}</p>
+      <p><strong>Bericht:</strong><br>${escapedMessage}</p>
+      <p><strong>Verzonden op:</strong> ${escapeHtml(new Date().toISOString())}</p>
+      <p><strong>IP-adres:</strong> ${escapeHtml(req.ip)}</p>
+    `
+  };
+
+  try {
+    await Promise.all([
+      transporter.sendMail(customerMail),
+      transporter.sendMail(internalMail)
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Bericht succesvol verzonden. Wij nemen spoedig contact met u op.'
+    });
+  } catch (error) {
+    console.error('Contact form email error:', error);
+    res.status(500).json({ error: 'Verzenden is nu niet gelukt. Probeert u het later opnieuw.' });
+  }
 });
 
 /**
