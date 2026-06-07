@@ -22,9 +22,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const data = await apiRequest<LoginResponse>("/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: normalizedEmail, password })
       });
       if (data.user.role === "ADMIN") {
         router.push("/admin");

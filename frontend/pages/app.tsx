@@ -229,13 +229,14 @@ export default function AppPage() {
   const [editCustomerEmail, setEditCustomerEmail] = React.useState("");
   const [editCustomerPhone, setEditCustomerPhone] = React.useState("");
   const [contactsEnabled, setContactsEnabled] = React.useState(false);
+  const [activeSection, setActiveSection] = React.useState<"overzicht" | "klanten" | "opvolging" | "import" | "account">("overzicht");
   const [eventCustomerId, setEventCustomerId] = React.useState("");
   const [eventMethod, setEventMethod] = React.useState("Telefoon");
   const [eventSummary, setEventSummary] = React.useState("");
   const [eventDateTime, setEventDateTime] = React.useState("");
   const [importText, setImportText] = React.useState("");
   const [importInfo, setImportInfo] = React.useState<string | null>(null);
-  const pollRef = React.useRef<NodeJS.Timeout | null>(null);
+  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadContactsOverview = React.useCallback(async (days = followUpDays) => {
     const data = await apiRequest<ContactsOverviewResponse>(`/contacts/customers?followUpDays=${days}`);
@@ -410,7 +411,7 @@ export default function AppPage() {
     setError(null);
 
     if (!eventCustomerId) {
-      setError("Select a customer first");
+      setError("Selecteer eerst een klant");
       return;
     }
 
@@ -520,7 +521,7 @@ export default function AppPage() {
     try {
       const text = await file.text();
       setImportText(text);
-      setImportInfo(`Loaded ${file.name}. Check and click import.`);
+      setImportInfo(`Bestand ${file.name} geladen. Controleer de data en klik op importeren.`);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -533,7 +534,7 @@ export default function AppPage() {
 
     const rows = parseImportRows(importText);
     if (!rows.length) {
-      setError("Import failed: missing rows or no Name/Naam column found");
+      setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
       return;
     }
 
@@ -550,7 +551,7 @@ export default function AppPage() {
       });
 
       setImportInfo(
-        `Imported ${result.importedRows} rows: ${result.createdCustomers} new customers, ${result.updatedCustomers} updated, ${result.createdEvents} contact moments.`
+        `${result.importedRows} regels verwerkt: ${result.createdCustomers} nieuwe klanten, ${result.updatedCustomers} bijgewerkt, ${result.createdEvents} contactmomenten toegevoegd.`
       );
       await loadContactsOverview();
     } catch (err) {
@@ -562,89 +563,105 @@ export default function AppPage() {
     ? summary.moneySaved.toFixed(2)
     : null;
 
-  const maxRuns = usage.reduce((max, point) => Math.max(max, point.runs), 0);
-  const environmentLabel = "Merlijn Meubels workspace";
+  const maxRuns = usage.reduce((max: number, point: UsagePoint) => Math.max(max, point.runs), 0);
+  const environmentLabel = "Merlijn Meubels omgeving";
 
   const lastSevenDays = usage.slice(-7);
+  const showOverview = activeSection === "overzicht";
+  const showCustomers = activeSection === "klanten";
+  const showFollowUp = activeSection === "opvolging";
+  const showImport = activeSection === "import";
+  const showAccount = activeSection === "account";
 
   return (
     <main className="workspace-shell">
       <section className="workspace-hero">
         <div className="workspace-hero-copy">
-          <div className="badge">Private client environment</div>
+          <div className="badge">Afgeschermde klantomgeving</div>
           <h1>{environmentLabel}</h1>
           <p className="workspace-lead">
-            A calm, trusted workspace for replacing spreadsheet work with one secure flow for quotes, follow-up and delivery.
+            Een vertrouwde werkomgeving om het handmatige Excel-proces te vervangen door een veilige en overzichtelijke workflow.
           </p>
           <div className="workspace-meta">
-            <span>{user ? `Signed in as ${user.email}` : "Loading account..."}</span>
-            <span>Protected environment</span>
-            <span>Single customer tenant</span>
+            <span>{user ? `Ingelogd als ${user.email}` : "Account laden..."}</span>
+            <span>Beveiligde omgeving</span>
+            <span>Alleen voor Merlijn Meubels</span>
           </div>
         </div>
 
         <div className="workspace-hero-panel">
-          <div className="workspace-panel-label">Live overview</div>
-          <div className="workspace-panel-value">{summary?.toolName ?? "Environment ready"}</div>
-          <div className="workspace-panel-subtitle">{jobStatus ? `Current status: ${jobStatus.status}` : "No run in progress"}</div>
+          <div className="workspace-panel-label">Live overzicht</div>
+          <div className="workspace-panel-value">{summary?.toolName ?? "Omgeving gereed"}</div>
+          <div className="workspace-panel-subtitle">{jobStatus ? `Huidige status: ${jobStatus.status}` : "Geen run actief"}</div>
           <div className="workspace-panel-stats">
             <div>
               <strong>{summary?.totalRuns ?? 0}</strong>
-              <span>Completed runs</span>
+              <span>Afgeronde runs</span>
             </div>
             <div>
-              <strong>{summary?.loginCount ?? 0}</strong>
-              <span>Logins</span>
+              <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+              <span>Klanten</span>
             </div>
             <div>
-              <strong>{summary?.dataUsedLabel ?? "0 B"}</strong>
-              <span>Data used</span>
+              <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
+              <span>Opvolging nodig</span>
             </div>
           </div>
         </div>
       </section>
 
+      <section className="workspace-nav">
+        <button className={`workspace-nav-button ${showOverview ? "active" : ""}`} type="button" onClick={() => setActiveSection("overzicht")}>Overzicht</button>
+        {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klanten</button> : null}
+        {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Opvolging</button> : null}
+        {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Import</button> : null}
+        <button className={`workspace-nav-button ${showAccount ? "active" : ""}`} type="button" onClick={() => setActiveSection("account")}>Profiel</button>
+      </section>
+
       <section className="workspace-grid">
+        {showOverview ? (
         <article className="workspace-card workspace-card-primary">
-          <div className="card eyebrow">Primary action</div>
-          <h2>Run the client process</h2>
+          <div className="card eyebrow">Hoofdactie</div>
+          <h2>Start het proces</h2>
           <p>
-            Start the automated report flow whenever the sheet-based process would normally be used.
+            Start de geautomatiseerde flow op het moment dat je normaal in Excel zou werken.
           </p>
           <div className="stack">
             <button className="button button-strong" onClick={runReport} disabled={!user}>
-              Generate report
+              Rapport genereren
             </button>
             <button
               className="button button-secondary"
               onClick={downloadReport}
               disabled={!report || downloaded || jobStatus?.status !== "done"}
             >
-              {downloaded ? "Downloaded" : "Download (one-time)"}
+              {downloaded ? "Gedownload" : "Downloaden (eenmalig)"}
             </button>
           </div>
           <div className="workspace-inline-status">
             <span>Status</span>
-            <strong>{jobStatus ? jobStatus.status : "idle"}</strong>
+            <strong>{jobStatus ? jobStatus.status : "inactief"}</strong>
           </div>
           {report && (
-            <div className="status">Output: {report.filename} ({Math.round(report.size_bytes / 1024)} KB)</div>
+            <div className="status">Bestand: {report.filename} ({Math.round(report.size_bytes / 1024)} KB)</div>
           )}
-          {downloaded && <div className="status">Downloaded. Generate a new report to download again.</div>}
+          {downloaded && <div className="status">Gedownload. Genereer opnieuw om nogmaals te downloaden.</div>}
           {jobStatus?.status === "failed" && jobStatus.error_message && (
             <div className="notice">{jobStatus.error_message}</div>
           )}
         </article>
+        ) : null}
 
+        {showAccount ? (
         <aside className="workspace-card workspace-card-side">
-          <div className="card eyebrow">Customer login</div>
-          <h3>Change credentials</h3>
-          <p>Keep the login secure and update email or password after handover.</p>
+          <div className="card eyebrow">Account</div>
+          <h3>Inloggegevens wijzigen</h3>
+          <p>Pas je e-mail of wachtwoord aan wanneer dat nodig is.</p>
           <form className="stack" onSubmit={updateAccount}>
             <input
               className="input"
               type="password"
-              placeholder="Current password"
+              placeholder="Huidig wachtwoord"
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
@@ -652,50 +669,54 @@ export default function AppPage() {
             <input
               className="input"
               type="email"
-              placeholder="New email login"
+              placeholder="Nieuw e-mailadres"
               value={newEmail}
               onChange={(event) => setNewEmail(event.target.value)}
             />
             <input
               className="input"
               type="password"
-              placeholder="New password"
+              placeholder="Nieuw wachtwoord"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               minLength={8}
             />
             <button className="button" type="submit">
-              Save login details
+              Inloggegevens opslaan
             </button>
           </form>
         </aside>
+        ) : null}
 
+        {showOverview ? (
         <article className="workspace-card">
-          <div className="card eyebrow">Business impact</div>
-          <h3>Usage and savings</h3>
+          <div className="card eyebrow">Resultaat</div>
+          <h3>Gebruik en besparing</h3>
           <div className="workspace-metrics">
             <div>
               <span>Runs</span>
               <strong>{summary?.totalRuns ?? 0}</strong>
             </div>
             <div>
-              <span>Saved</span>
+              <span>Besparing</span>
               <strong>{moneySaved ? `EUR ${moneySaved}` : "-"}</strong>
             </div>
             <div>
-              <span>Data used</span>
-              <strong>{summary?.dataUsedLabel ?? "0 B"}</strong>
+              <span>Klanten</span>
+              <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
             </div>
           </div>
           {summary && (
-            <div className="status">Tool access: {summary.toolName ?? "Report generator"}</div>
+            <div className="status">Actieve tool: {summary.toolName ?? "Rapport generator"}</div>
           )}
         </article>
+        ) : null}
 
+        {showOverview ? (
         <article className="workspace-card">
           <div className="card eyebrow">Trend</div>
-          <h3>Last 7 days</h3>
-          <p className="status">The most recent activity in this environment.</p>
+          <h3>Laatste 7 dagen</h3>
+          <p className="status">Recente activiteit in deze omgeving.</p>
           {lastSevenDays.length > 0 ? (
             <div className="trend-chart">
               {lastSevenDays.map((point) => (
@@ -710,102 +731,110 @@ export default function AppPage() {
               ))}
             </div>
           ) : (
-            <div className="status">No usage yet.</div>
+            <div className="status">Nog geen gebruik geregistreerd.</div>
           )}
         </article>
+        ) : null}
 
-        {contactsEnabled ? (
+        {showCustomers ? (
+          contactsEnabled ? (
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Klantbeheer</div>
+              <h3>Contactmomenten registreren</h3>
+              <p className="status">
+                Voeg klanten toe en registreer contactmomenten handmatig. Opvolging wordt daarna automatisch berekend.
+              </p>
+
+              <div className="workspace-split">
+                <div className="stack">
+                  <h4>Nieuwe klant</h4>
+                  <p className="status">Open het venster om een klant met alle gegevens toe te voegen.</p>
+                  <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>
+                    Klant toevoegen
+                  </button>
+                </div>
+
+                <form className="stack" onSubmit={registerContactEvent}>
+                  <h4>Contact registreren</h4>
+                  <select
+                    className="input"
+                    value={eventCustomerId}
+                    onChange={(entry) => setEventCustomerId(entry.target.value)}
+                    required
+                  >
+                    {contactsOverview?.customers.length ? (
+                      contactsOverview.customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>{customer.name}</option>
+                      ))
+                    ) : (
+                      <option value="">Nog geen klanten</option>
+                    )}
+                  </select>
+                  <select
+                    className="input"
+                    value={eventMethod}
+                    onChange={(entry) => setEventMethod(entry.target.value)}
+                  >
+                    <option>Telefoon</option>
+                    <option>Email</option>
+                    <option>WhatsApp</option>
+                    <option>Op locatie</option>
+                    <option>Overig</option>
+                  </select>
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={eventDateTime}
+                    onChange={(entry) => setEventDateTime(entry.target.value)}
+                  />
+                  <textarea
+                    className="input"
+                    placeholder="Korte notitie over het contact"
+                    value={eventSummary}
+                    onChange={(entry) => setEventSummary(entry.target.value)}
+                    rows={3}
+                  />
+                  <button className="button" type="submit" disabled={!contactsOverview?.customers.length}>Contact opslaan</button>
+                </form>
+              </div>
+            </article>
+          ) : (
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Klantbeheer</div>
+              <h3>Contactmodule niet actief</h3>
+              <p className="status">Deze module is alleen beschikbaar in de omgeving van Merlijn Meubels.</p>
+            </article>
+          )
+        ) : null}
+
+        {contactsEnabled && showImport ? (
         <article className="workspace-card workspace-card-wide">
-          <div className="card eyebrow">Manual customer updates</div>
-          <h3>Record contact from Excel workflow</h3>
+          <div className="card eyebrow">Excel import</div>
+          <h3>Bestaande Excel data importeren</h3>
           <p className="status">
-            Add the customer and log each contact moment manually. The dashboard calculates follow-up priority automatically.
+            Verplichte kolom: Name of Naam. Optioneel: Company/Bedrijf, Email, Phone/Telefoon, ContactedAt/Datum, ContactMethod/Methode, Summary/Notitie.
           </p>
-
-          <div className="workspace-split">
-            <div className="stack">
-              <h4>Create customer</h4>
-              <p className="status">Open the popup to add a new customer with full details.</p>
-              <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>
-                New customer
-              </button>
-            </div>
-
-            <form className="stack" onSubmit={registerContactEvent}>
-              <h4>Log contact moment</h4>
-              <select
-                className="input"
-                value={eventCustomerId}
-                onChange={(entry) => setEventCustomerId(entry.target.value)}
-                required
-              >
-                {contactsOverview?.customers.length ? (
-                  contactsOverview.customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>{customer.name}</option>
-                  ))
-                ) : (
-                  <option value="">No customers yet</option>
-                )}
-              </select>
-              <select
-                className="input"
-                value={eventMethod}
-                onChange={(entry) => setEventMethod(entry.target.value)}
-              >
-                <option>Telefoon</option>
-                <option>Email</option>
-                <option>WhatsApp</option>
-                <option>Op locatie</option>
-                <option>Overig</option>
-              </select>
-              <input
-                className="input"
-                type="datetime-local"
-                value={eventDateTime}
-                onChange={(entry) => setEventDateTime(entry.target.value)}
-              />
-              <textarea
-                className="input"
-                placeholder="Short note about the contact"
-                value={eventSummary}
-                onChange={(entry) => setEventSummary(entry.target.value)}
-                rows={3}
-              />
-              <button className="button" type="submit" disabled={!contactsOverview?.customers.length}>Save contact</button>
-            </form>
-          </div>
-
           <form className="stack workspace-import" onSubmit={importRows}>
-            <h4>Bulk import from Excel export (CSV)</h4>
-            <p className="status">
-              Required column: Name or Naam. Optional: Company/Bedrijf, Email, Phone/Telefoon, ContactedAt/Datum, ContactMethod/Methode, Summary/Notitie.
-            </p>
             <input className="input" type="file" accept=".csv,.txt" onChange={onImportFilePicked} />
             <textarea
               className="input"
-              rows={6}
+              rows={8}
               value={importText}
               onChange={(entry) => setImportText(entry.target.value)}
               placeholder={"Name,Company,Email,ContactedAt,ContactMethod,Summary\nJan Jansen,Merlijn Meubels,jan@example.nl,2026-06-01 10:30,Telefoon,Interesse in offerte"}
             />
-            <button className="button" type="submit">Import rows</button>
+            <button className="button" type="submit">Regels importeren</button>
             {importInfo ? <div className="status">{importInfo}</div> : null}
           </form>
         </article>
-        ) : (
-        <article className="workspace-card workspace-card-wide">
-          <div className="card eyebrow">Manual customer updates</div>
-          <h3>Contact module not active</h3>
-          <p className="status">Deze module is alleen beschikbaar in de omgeving van Merlijn Meubels.</p>
-        </article>
-        )}
+        ) : null}
 
-        {contactsEnabled ? (
+        {contactsEnabled && showFollowUp ? (
         <article className="workspace-card workspace-card-wide">
-          <div className="card eyebrow">Follow-up insights</div>
-          <h3>Who needs opvolging?</h3>
+          <div className="card eyebrow">Opvolging</div>
+          <h3>Welke klanten hebben opvolging nodig?</h3>
           <form className="workspace-follow-up-filter" onSubmit={updateFollowUpWindow}>
-            <label className="status" htmlFor="follow-up-days">Follow-up after days without contact</label>
+            <label className="status" htmlFor="follow-up-days">Opvolging na aantal dagen zonder contact</label>
             <input
               id="follow-up-days"
               className="input"
@@ -815,21 +844,21 @@ export default function AppPage() {
               value={followUpDays}
               onChange={(entry) => setFollowUpDays(Number(entry.target.value) || 14)}
             />
-            <button className="button" type="submit">Refresh</button>
+            <button className="button" type="submit">Verversen</button>
           </form>
 
           <div className="workspace-metrics" style={{ marginTop: 10 }}>
             <div>
-              <span>Total customers</span>
+              <span>Totaal klanten</span>
               <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
             </div>
             <div>
-              <span>Need follow-up</span>
+              <span>Opvolging nodig</span>
               <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
             </div>
             <div>
-              <span>Window</span>
-              <strong>{contactsOverview?.followUpDays ?? followUpDays} days</strong>
+              <span>Termijn</span>
+              <strong>{contactsOverview?.followUpDays ?? followUpDays} dagen</strong>
             </div>
           </div>
 
@@ -837,11 +866,11 @@ export default function AppPage() {
             <table className="workspace-table">
               <thead>
                 <tr>
-                  <th>Customer</th>
-                  <th>Last contact</th>
-                  <th>Days ago</th>
+                  <th>Klant</th>
+                  <th>Laatste contact</th>
+                  <th>Dagen geleden</th>
                   <th>Status</th>
-                  <th>Action</th>
+                  <th>Actie</th>
                 </tr>
               </thead>
               <tbody>
@@ -855,12 +884,12 @@ export default function AppPage() {
                       <td>
                         {customer.lastContactAt
                           ? new Date(customer.lastContactAt).toLocaleString()
-                          : "No contact logged"}
+                          : "Nog geen contact geregistreerd"}
                       </td>
                       <td>{customer.daysSinceLastContact ?? "-"}</td>
                       <td>
                         <span className={customer.needsFollowUp ? "tag tag-alert" : "tag"}>
-                          {customer.needsFollowUp ? "Follow-up needed" : "Up to date"}
+                          {customer.needsFollowUp ? "Opvolging nodig" : "Bijgewerkt"}
                         </span>
                       </td>
                       <td>
@@ -877,7 +906,7 @@ export default function AppPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5}>No customers added yet.</td>
+                    <td colSpan={5}>Nog geen klanten toegevoegd.</td>
                   </tr>
                 )}
               </tbody>

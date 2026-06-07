@@ -28,9 +28,10 @@ router.post("/login", async (req, res, next) => {
     checkRateLimit(`login:${ip}`, env.LOGIN_RATE_LIMIT_MAX, env.LOGIN_RATE_LIMIT_WINDOW_SECONDS);
 
     const { email, password } = loginSchema.parse(req.body);
+    const normalizedEmail = email.trim().toLowerCase();
     const result = await pool.query(
-      "SELECT id, tenant_id, email, password_hash, role FROM users WHERE email = $1",
-      [email]
+      "SELECT id, tenant_id, email, password_hash, role FROM users WHERE lower(email) = $1",
+      [normalizedEmail]
     );
     const user = result.rows[0];
     const match = user ? await bcrypt.compare(password, user.password_hash) : false;
@@ -104,9 +105,10 @@ router.post("/account", requireAuth, async (req, res, next) => {
     }
 
     if (newEmail) {
+      const normalizedNewEmail = newEmail.trim().toLowerCase();
       const emailResult = await pool.query(
-        "SELECT id FROM users WHERE email = $1",
-        [newEmail]
+        "SELECT id FROM users WHERE lower(email) = $1",
+        [normalizedNewEmail]
       );
       const existingUser = emailResult.rows[0];
       if (existingUser && existingUser.id !== user.id) {
@@ -115,7 +117,7 @@ router.post("/account", requireAuth, async (req, res, next) => {
 
       await pool.query(
         "UPDATE users SET email = $1 WHERE id = $2",
-        [newEmail, user.id]
+        [normalizedNewEmail, user.id]
       );
     }
 
@@ -132,7 +134,7 @@ router.post("/account", requireAuth, async (req, res, next) => {
       user: {
         id: user.id,
         tenantId: user.tenant_id,
-        email: newEmail ?? user.email,
+        email: newEmail ? newEmail.trim().toLowerCase() : user.email,
         role: req.auth?.role ?? "USER"
       }
     });
