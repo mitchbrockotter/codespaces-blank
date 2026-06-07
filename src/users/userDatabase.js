@@ -19,6 +19,19 @@ let users = [
     status: 'active',
     createdAt: new Date('2026-03-11'),
     lastLogin: null
+  },
+  {
+    id: 2,
+    username: 'info@merlijn-meubels.nl',
+    email: 'info@merlijn-meubels.nl',
+    password: bcryptjs.hashSync('Welkom123', 10),
+    company: 'Merlijn Meubels',
+    role: 'customer',
+    environment: 'Merlijn Meubels - Customer Environment',
+    redirectPath: '/environment',
+    status: 'active',
+    createdAt: new Date('2026-06-07'),
+    lastLogin: null
   }
 ];
 
@@ -141,6 +154,34 @@ function updateUser(userId, updateData) {
 }
 
 /**
+ * Update user password
+ */
+function updateUserPassword(userId, newPassword) {
+  const user = findById(userId);
+  if (!user) {
+    return null;
+  }
+
+  user.password = bcryptjs.hashSync(newPassword, 10);
+  user.updatedAt = new Date();
+  return true;
+}
+
+/**
+ * Update user username
+ */
+function updateUserUsername(userId, newUsername) {
+  const user = findById(userId);
+  if (!user) {
+    return null;
+  }
+
+  user.username = newUsername;
+  user.updatedAt = new Date();
+  return true;
+}
+
+/**
  * Delete user
  */
 function deleteUser(userId) {
@@ -255,6 +296,8 @@ module.exports = {
   createUser,
   getUserEnvironment,
   updateUser,
+  updateUserPassword,
+  updateUserUsername,
   deleteUser,
   getUserRedirectPath,
   setUserRedirectPath,

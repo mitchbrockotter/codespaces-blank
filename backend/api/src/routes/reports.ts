@@ -9,6 +9,17 @@ import { generateToken, sha256 } from "../utils";
 
 const router = Router();
 
+function formatBytes(bytes: number) {
+  if (!bytes) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / (1024 ** unitIndex);
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 router.use(requireAuth);
 
 router.post("/run", async (req, res, next) => {
@@ -142,7 +153,7 @@ router.get("/summary", async (req, res, next) => {
     }
 
     const settingsResult = await pool.query(
-      "SELECT ts.time_saved_minutes, ts.hourly_rate, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
+      "SELECT ts.time_saved_minutes, ts.hourly_rate, ts.login_count, ts.data_used_bytes, ts.last_login_at, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
       [tenantId]
     );
     const settings = settingsResult.rows[0] ?? null;
@@ -159,13 +170,18 @@ router.get("/summary", async (req, res, next) => {
       timeSavedMinutes !== null && hourlyRate !== null
         ? Number(((totalRuns * timeSavedMinutes) / 60) * hourlyRate)
         : null;
+    const dataUsedBytes = Number(settings?.data_used_bytes ?? 0);
 
     return res.json({
       toolName: settings?.jar_name ?? null,
       totalRuns,
       timeSavedMinutes,
       hourlyRate,
-      moneySaved
+      moneySaved,
+      loginCount: settings?.login_count ?? 0,
+      dataUsedBytes,
+      dataUsedLabel: formatBytes(dataUsedBytes),
+      lastLoginAt: settings?.last_login_at ?? null
     });
   } catch (error) {
     return next(error);

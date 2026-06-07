@@ -125,6 +125,7 @@
                 <div class="admin-controls">
                     <input type="text" id="envSearch" placeholder="Zoek omgevingen..." class="search-input">
                     <button id="addEnvBtn" class="btn btn-primary">+ Nieuwe Omgeving</button>
+                    <button id="addCustomerEnvBtn" class="btn btn-primary">+ Nieuwe Klantomgeving</button>
                 </div>
 
                 <div id="environmentsTable" class="table-container">
@@ -134,15 +135,18 @@
                                 <th>Omgeving ID</th>
                                 <th>Gebruiker</th>
                                 <th>Bedrijf</th>
+                                <th>Type</th>
                                 <th>Status</th>
                                 <th>Tools</th>
+                                <th>Logins</th>
+                                <th>Data Used</th>
                                 <th>Aangemaakt</th>
                                 <th>Acties</th>
                             </tr>
                         </thead>
                         <tbody id="environmentsTableBody">
                             <tr>
-                                <td colspan="7" class="loading">Omgevingen laden...</td>
+                                <td colspan="9" class="loading">Omgevingen laden...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -172,6 +176,10 @@
                     <textarea id="envDescription" rows="3" placeholder="Omschrijf het doel van deze omgeving"></textarea>
                 </div>
                 <div class="form-group">
+                    <label for="envType">Type omgeving</label>
+                    <input type="text" id="envType" placeholder="bijv. crm, production, staging">
+                </div>
+                <div class="form-group">
                     <label for="envStatus">Status</label>
                     <select id="envStatus">
                         <option value="active">Actief</option>
@@ -180,6 +188,56 @@
                     </select>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">Omgeving Aanmaken</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Customer Environment Modal -->
+    <div id="addCustomerEnvModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="addCustomerEnvClose">&times;</span>
+            <h2>Nieuwe Klantomgeving Aanmaken</h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                Maak in één stap een nieuwe omgeving, een loginnaam en een wachtwoord aan voor een klant.
+            </p>
+            <form id="addCustomerEnvForm" class="form">
+                <div class="form-group">
+                    <label for="customerCompany">Bedrijfsnaam *</label>
+                    <input type="text" id="customerCompany" required placeholder="Bedrijf B.V.">
+                </div>
+                <div class="form-group">
+                    <label for="customerEnvName">Omgeving Naam</label>
+                    <input type="text" id="customerEnvName" placeholder="Bijv. CRM Omgeving of Productie Omgeving">
+                </div>
+                <div class="form-group">
+                    <label for="customerEnvType">Type omgeving</label>
+                    <input type="text" id="customerEnvType" required placeholder="crm, production, staging">
+                </div>
+                <div class="form-group">
+                    <label for="customerUsername">Loginnaam *</label>
+                    <input type="text" id="customerUsername" required placeholder="gebruikersnaam">
+                </div>
+                <div class="form-group">
+                    <label for="customerEmail">E-mail *</label>
+                    <input type="email" id="customerEmail" required placeholder="naam@bedrijf.com">
+                </div>
+                <div class="form-group">
+                    <label for="customerPassword">Wachtwoord *</label>
+                    <input type="password" id="customerPassword" required placeholder="Minimaal 8 karakters">
+                </div>
+                <div class="form-group">
+                    <label for="customerDescription">Beschrijving</label>
+                    <textarea id="customerDescription" rows="3" placeholder="Omschrijf wat deze omgeving doet"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="customerStatus">Status</label>
+                    <select id="customerStatus">
+                        <option value="active">Actief</option>
+                        <option value="maintenance">Onderhoud</option>
+                        <option value="inactive">Inactief</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Klantomgeving Aanmaken</button>
             </form>
         </div>
     </div>
@@ -201,6 +259,10 @@
                     <textarea id="editEnvDescription" rows="3"></textarea>
                 </div>
                 <div class="form-group">
+                    <label for="editEnvType">Type omgeving</label>
+                    <input type="text" id="editEnvType">
+                </div>
+                <div class="form-group">
                     <label for="editEnvStatus">Status</label>
                     <select id="editEnvStatus">
                         <option value="active">Actief</option>
@@ -212,6 +274,13 @@
                     <label>Geïnstalleerde Tools</label>
                     <div id="envToolsList" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 6px; min-height: 100px;">
                         <p style="color: var(--text-light); font-size: 0.9rem;">Geen tools geïnstalleerd</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Omgevingsdata</label>
+                    <div id="envMetricsCard" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 6px; min-height: 100px;">
+                        <p style="color: var(--text-light); font-size: 0.9rem;">Statistieken laden...</p>
                     </div>
                 </div>
                 

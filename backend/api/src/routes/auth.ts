@@ -14,6 +14,14 @@ const loginSchema = z.object({
   password: z.string().min(6)
 });
 
+const accountSchema = z.object({
+  currentPassword: z.string().min(1),
+  newEmail: z.string().email().optional(),
+  newPassword: z.string().min(8).optional()
+}).refine((value) => Boolean(value.newEmail || value.newPassword), {
+  message: "Provide a new email and/or new password"
+});
+
 router.post("/login", async (req, res, next) => {
   try {
     const ip = req.ip || "unknown";
@@ -45,6 +53,11 @@ router.post("/login", async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
+    await pool.query(
+      "INSERT INTO tenant_settings (tenant_id, login_count, last_login_at, updated_at) VALUES ($1, 1, now(), now()) ON CONFLICT (tenant_id) DO UPDATE SET login_count = tenant_settings.login_count + 1, last_login_at = now(), updated_at = now()",
+      [user.tenant_id]
+    );
+
     return res.json({
       user: {
         id: user.id,
@@ -70,6 +83,62 @@ router.post("/logout", (req, res) => {
 
 router.get("/me", requireAuth, (req, res) => {
   return res.json({ user: req.auth });
+});
+
+router.post("/account", requireAuth, async (req, res, next) => {
+  try {
+    const { currentPassword, newEmail, newPassword } = accountSchema.parse(req.body);
+
+    const result = await pool.query(
+      "SELECT id, tenant_id, email, password_hash FROM users WHERE id = $1",
+      [req.auth?.id]
+    );
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    if (newEmail) {
+      const emailResult = await pool.query(
+        "SELECT id FROM users WHERE email = $1",
+        [newEmail]
+      );
+      const existingUser = emailResult.rows[0];
+      if (existingUser && existingUser.id !== user.id) {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+
+      await pool.query(
+        "UPDATE users SET email = $1 WHERE id = $2",
+        [newEmail, user.id]
+      );
+    }
+
+    if (newPassword) {
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await pool.query(
+        "UPDATE users SET password_hash = $1 WHERE id = $2",
+        [passwordHash, user.id]
+      );
+    }
+
+    return res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        tenantId: user.tenant_id,
+        email: newEmail ?? user.email,
+        role: req.auth?.role ?? "USER"
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 export default router;

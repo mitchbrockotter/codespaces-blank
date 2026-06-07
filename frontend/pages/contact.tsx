@@ -68,7 +68,7 @@ export default function ContactPage() {
         return;
       }
 
-      setSuccess(data.message || "Bedankt voor uw bericht. Wij nemen zo snel mogelijk contact met u op.");
+      setSuccess(data.message || "Bericht verzonden naar pkbackendautomation@gmail.com. Wij nemen zo snel mogelijk contact met u op.");
       setName("");
       setEmail("");
       setSubject("");
@@ -108,7 +108,7 @@ export default function ContactPage() {
       <main className="contact-page-container">
         <section className="contact-form-panel">
           <h1>Contact Opnemen</h1>
-          <p className="contact-page-subtitle">Stuur ons een bericht. Wij bevestigen uw aanvraag direct per e-mail.</p>
+          <p className="contact-page-subtitle">Stuur ons een bericht. Wij ontvangen uw aanvraag op pkbackendautomation@gmail.com en bevestigen direct per e-mail.</p>
 
           <form className="contact-form" onSubmit={onSubmit} noValidate>
             <div className="honeypot-wrap" aria-hidden="true">

@@ -15,7 +15,7 @@ const envDb = require('./src/environments/environmentDatabase');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CONTACT_RECIPIENT_EMAIL = 'pkbackendautomation@outlook.com';
+const CONTACT_RECIPIENT_EMAIL = 'pkbackendautomation@gmail.com';
 const CONTACT_RATE_LIMIT_WINDOW_MS = Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const CONTACT_RATE_LIMIT_MAX_REQUESTS = Number(process.env.CONTACT_RATE_LIMIT_MAX_REQUESTS || 5);
 const contactRateLimitStore = new Map();
@@ -64,6 +64,78 @@ function isContactRateLimited(ipAddress) {
   requests.push(now);
   contactRateLimitStore.set(ipAddress, requests);
   return false;
+}
+
+function getCustomerEnvironmentName(user) {
+  const companyName = (user.company || user.username || 'Customer').trim();
+  return `${companyName} - Customer Environment`;
+}
+
+function ensureCustomerEnvironment(user) {
+  if (!user || user.role !== 'customer') {
+    return null;
+  }
+
+  const existingEnvironment = envDb.getEnvironmentByUserId(user.id);
+  if (existingEnvironment) {
+    if (user.environment !== existingEnvironment.name) {
+      userDb.updateUser(user.id, { environment: existingEnvironment.name });
+    }
+    return existingEnvironment;
+  }
+
+  const environmentName = getCustomerEnvironmentName(user);
+  const environmentDescription = `Dedicated environment for ${user.company || user.username}. Upload automation tools and reports here.`;
+  const createdEnvironment = envDb.createEnvironment({
+    userId: user.id,
+    name: environmentName,
+    description: environmentDescription,
+    status: 'active'
+  });
+
+  userDb.updateUser(user.id, { environment: createdEnvironment.name });
+  return createdEnvironment;
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value === 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const unitIndex = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const size = value / (1024 ** unitIndex);
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function createCustomerEnvironmentAccount(accountData) {
+  const username = accountData.username.trim();
+  const company = accountData.company.trim();
+  const environmentType = (accountData.type || 'general').trim() || 'general';
+  const environmentName = accountData.name?.trim() || `${company} - ${environmentType.charAt(0).toUpperCase() + environmentType.slice(1)} Environment`;
+  const description = accountData.description?.trim() || `Dedicated ${environmentType} environment for ${company}.`;
+
+  const newUser = userDb.createUser({
+    username,
+    email: accountData.email.trim(),
+    password: accountData.password,
+    company,
+    role: 'customer',
+    environment: environmentName
+  });
+
+  const createdEnvironment = envDb.createEnvironment({
+    userId: newUser.id,
+    name: environmentName,
+    description,
+    type: environmentType,
+    status: accountData.status || 'active'
+  });
+
+  userDb.updateUser(newUser.id, { environment: createdEnvironment.name, redirectPath: '/environment' });
+
+  return { user: userDb.findById(newUser.id), environment: createdEnvironment };
 }
 
 // CORS - Allow frontend to connect from different domain
@@ -216,6 +288,15 @@ app.post('/api/login', (req, res) => {
   }
 
   console.log('✅ User authenticated:', { id: user.id, username: user.username, role: user.role });
+
+  const persistedUser = userDb.findById(user.id);
+  if (persistedUser) {
+    const customerEnvironment = ensureCustomerEnvironment(persistedUser);
+    if (customerEnvironment) {
+      envDb.recordEnvironmentLogin(customerEnvironment.id);
+      user.environment = customerEnvironment.name;
+    }
+  }
   
   // Update last login
   userDb.updateUserLastLogin(user.id);
@@ -229,7 +310,7 @@ app.post('/api/login', (req, res) => {
   req.session.email = user.email;
   req.session.company = user.company;
   req.session.role = user.role;
-  req.session.environment = user.environment;
+  req.session.environment = userDb.findById(user.id)?.environment || user.environment;
 
   console.log('📝 Session stored:', { 
     userId: req.session.userId, 
@@ -257,7 +338,7 @@ app.post('/api/login', (req, res) => {
         username: user.username,
         company: user.company,
         role: user.role,
-        environment: user.environment
+        environment: req.session.environment
       },
       redirect: redirectPath
     });
@@ -362,7 +443,7 @@ app.post('/api/contact', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Bericht succesvol verzonden. Wij nemen spoedig contact met u op.'
+      message: 'Bericht succesvol verzonden naar pkbackendautomation@gmail.com. Wij nemen spoedig contact met u op.'
     });
   } catch (error) {
     console.error('Contact form email error:', error);
@@ -396,6 +477,11 @@ app.get('/api/user', auth.isAuthenticated, (req, res) => {
  * GET /api/environment
  */
 app.get('/api/environment', auth.isAuthenticated, (req, res) => {
+  const currentUser = userDb.findById(req.session.userId);
+  if (currentUser) {
+    ensureCustomerEnvironment(currentUser);
+  }
+
   // Get user's environments from environment database
   const userEnvironments = envDb.getEnvironmentsByUserId(req.session.userId);
   
@@ -412,12 +498,17 @@ app.get('/api/environment', auth.isAuthenticated, (req, res) => {
     id: primaryEnv.id,
     name: primaryEnv.name,
     description: primaryEnv.description,
+    type: primaryEnv.type || 'general',
     status: primaryEnv.status === 'active' ? 'Operational' : primaryEnv.status,
     company: req.session.company,
     tools: primaryEnv.tools || [],
     dashboards: ['Overview', 'Performance', 'Logs', 'Alerts'],
     services: ['API Server', 'Database', 'Cache', 'Queue'],
     uptime: '99.9%',
+    loginCount: primaryEnv.loginCount || 0,
+    dataUsedBytes: primaryEnv.dataUsedBytes || 0,
+    dataUsedLabel: formatBytes(primaryEnv.dataUsedBytes || 0),
+    lastLoginAt: primaryEnv.lastLoginAt,
     createdAt: primaryEnv.createdAt,
     updatedAt: primaryEnv.updatedAt
   };
@@ -468,15 +559,9 @@ app.post('/api/users', auth.isAuthenticated, auth.isAdmin, (req, res) => {
 
   // Automatically create isolated environment for new customer
   if (role === 'customer') {
-    const environmentName = `${company} - Customer Environment`;
-    const environmentDescription = `Dedicated environment for ${company}. Upload automation tools and reports here.`;
-    
-    envDb.createEnvironment({
-      userId: newUser.id,
-      name: environmentName,
-      description: environmentDescription,
-      status: 'active'
-    });
+    const persistedUser = userDb.findById(newUser.id);
+    const createdEnvironment = ensureCustomerEnvironment(persistedUser || newUser);
+    userDb.updateUser(newUser.id, { redirectPath: '/environment' });
     
     userDb.logActivity(req.session.userId, 'create_environment', `Auto-created environment for new user: ${username}`);
   }
@@ -488,6 +573,52 @@ app.post('/api/users', auth.isAuthenticated, auth.isAdmin, (req, res) => {
     success: true,
     user: newUser
   });
+});
+
+/**
+ * Create a customer account and environment in one action
+ * POST /api/customer-environments
+ */
+app.post('/api/customer-environments', auth.isAuthenticated, auth.isAdmin, (req, res) => {
+  const { username, email, password, company, name, description, type, status } = req.body;
+
+  if (!username || !email || !password || !company) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const existingUser = userDb.findByUsername(username);
+  if (existingUser) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+
+  const existingEmail = userDb.findByEmail(email);
+  if (existingEmail) {
+    return res.status(409).json({ error: 'Email already exists' });
+  }
+
+  try {
+    const { user, environment } = createCustomerEnvironmentAccount({
+      username,
+      email,
+      password,
+      company,
+      name,
+      description,
+      type,
+      status
+    });
+
+    userDb.logActivity(req.session.userId, 'create_environment', `Created customer account and environment: ${user.username}`);
+
+    return res.status(201).json({
+      success: true,
+      user,
+      environment
+    });
+  } catch (error) {
+    console.error('Failed to create customer environment:', error);
+    return res.status(500).json({ error: 'Could not create customer environment' });
+  }
 });
 
 /**
@@ -525,6 +656,11 @@ app.put('/api/users/:id', auth.isAuthenticated, auth.isAdmin, (req, res) => {
 
   if (!updatedUser) {
     return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (updatedUser.role === 'customer') {
+    const persistedUser = userDb.findById(userId);
+    ensureCustomerEnvironment(persistedUser || updatedUser);
   }
 
   // Log activity
@@ -614,6 +750,99 @@ app.put('/api/users/:id/status', auth.isAuthenticated, auth.isAdmin, (req, res) 
 });
 
 /**
+ * Change own password
+ * POST /api/user/password
+ */
+app.post('/api/user/password', auth.isAuthenticated, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  }
+
+  const user = userDb.findById(req.session.userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (!userDb.verifyPassword(currentPassword, user.password)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  userDb.updateUserPassword(user.id, newPassword);
+  userDb.logActivity(user.id, 'change_password', 'User updated their password');
+
+  res.json({ success: true });
+});
+
+/**
+ * Update own login name and/or password
+ * POST /api/user/account
+ */
+app.post('/api/user/account', auth.isAuthenticated, (req, res) => {
+  const { currentPassword, newUsername, newPassword } = req.body;
+
+  if (!currentPassword) {
+    return res.status(400).json({ error: 'Current password is required' });
+  }
+
+  if (!newUsername && !newPassword) {
+    return res.status(400).json({ error: 'Provide a new username and/or new password' });
+  }
+
+  const user = userDb.findById(req.session.userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (!userDb.verifyPassword(currentPassword, user.password)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  if (newUsername) {
+    const trimmedUsername = String(newUsername).trim();
+    if (trimmedUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+
+    const existingUser = userDb.findByUsername(trimmedUsername);
+    if (existingUser && existingUser.id !== user.id) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+
+    userDb.updateUserUsername(user.id, trimmedUsername);
+    req.session.username = trimmedUsername;
+  }
+
+  if (newPassword) {
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    userDb.updateUserPassword(user.id, newPassword);
+  }
+
+  userDb.logActivity(user.id, 'update_credentials', 'User updated login credentials');
+
+  const updatedUser = userDb.findById(user.id);
+  res.json({
+    success: true,
+    user: {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      company: updatedUser.company,
+      role: updatedUser.role,
+      environment: updatedUser.environment
+    }
+  });
+});
+
+/**
  * Get activity log (Admin only)
  * GET /api/activities
  */
@@ -650,10 +879,15 @@ app.get('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => {
   // Enrich with user information
   const enrichedEnvironments = environments.map(env => {
     const user = userDb.findById(env.userId);
+    const metrics = envDb.getEnvironmentMetrics(env.id) || {};
     return {
       ...env,
       username: user ? user.username : 'Unknown',
-      company: user ? user.company : 'Unknown'
+      company: user ? user.company : 'Unknown',
+      loginCount: metrics.loginCount || 0,
+      dataUsedBytes: metrics.dataUsedBytes || 0,
+      dataUsedLabel: metrics.dataUsedBytes ? formatBytes(metrics.dataUsedBytes) : '0 B',
+      lastLoginAt: metrics.lastLoginAt
     };
   });
   
@@ -685,7 +919,12 @@ app.get('/api/environments/:id', auth.isAuthenticated, (req, res) => {
     return res.status(403).json({ error: 'Access denied' });
   }
   
-  res.json(environment);
+  res.json({
+    ...environment,
+    loginCount: environment.loginCount || 0,
+    dataUsedBytes: environment.dataUsedBytes || 0,
+    dataUsedLabel: formatBytes(environment.dataUsedBytes || 0)
+  });
 });
 
 /**
@@ -693,7 +932,7 @@ app.get('/api/environments/:id', auth.isAuthenticated, (req, res) => {
  * POST /api/environments
  */
 app.post('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => {
-  const { userId, name, description, status } = req.body;
+  const { userId, name, description, type, status } = req.body;
   
   if (!userId || !name) {
     return res.status(400).json({ error: 'User ID and name are required' });
@@ -709,6 +948,7 @@ app.post('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => 
     userId: parseInt(userId),
     name,
     description,
+    type,
     status
   });
   
@@ -723,11 +963,12 @@ app.post('/api/environments', auth.isAuthenticated, auth.isAdmin, (req, res) => 
  * PUT /api/environments/:id
  */
 app.put('/api/environments/:id', auth.isAuthenticated, auth.isAdmin, (req, res) => {
-  const { name, description, status, tools } = req.body;
+  const { name, description, type, status, tools } = req.body;
   
   const updatedEnvironment = envDb.updateEnvironment(req.params.id, {
     name,
     description,
+    type,
     status,
     tools
   });
@@ -838,7 +1079,8 @@ app.post('/api/environments/:id/projects/upload', auth.isAuthenticated, auth.isA
   // Add project to environment
   const project = envDb.addProject(req.params.id, {
     name: projectName,
-    jarFile: req.file.filename
+    jarFile: req.file.filename,
+    sizeBytes: req.file.size
   });
   
   // Log activity

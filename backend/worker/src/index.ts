@@ -96,6 +96,11 @@ async function runJob(job: JobRow, jar: JarRow) {
     );
 
     await pool.query(
+      "INSERT INTO tenant_settings (tenant_id, data_used_bytes, updated_at) VALUES ($1, $2, now()) ON CONFLICT (tenant_id) DO UPDATE SET data_used_bytes = tenant_settings.data_used_bytes + $2, updated_at = now()",
+      [job.tenant_id, fileStats.size]
+    );
+
+    await pool.query(
       "UPDATE jobs SET status = 'done', progress = 100, finished_at = now() WHERE id = $1",
       [job.id]
     );

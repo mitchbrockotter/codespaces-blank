@@ -25,6 +25,10 @@ type SummaryResponse = {
   timeSavedMinutes: number | null;
   hourlyRate: number | null;
   moneySaved: number | null;
+  loginCount?: number;
+  dataUsedBytes?: number;
+  dataUsedLabel?: string;
+  lastLoginAt?: string | null;
 };
 
 type UsagePoint = {
@@ -41,6 +45,9 @@ export default function AdminPage() {
   const [error, setError] = React.useState<string | null>(null);
 
   const [tenantName, setTenantName] = React.useState("");
+  const [environmentName, setEnvironmentName] = React.useState("");
+  const [environmentEmail, setEnvironmentEmail] = React.useState("");
+  const [environmentPassword, setEnvironmentPassword] = React.useState("");
   const [userEmail, setUserEmail] = React.useState("");
   const [userPassword, setUserPassword] = React.useState("");
   const [userTenantId, setUserTenantId] = React.useState("");
@@ -105,6 +112,28 @@ export default function AdminPage() {
         body: JSON.stringify({ name: tenantName })
       });
       setTenantName("");
+      await loadTenants();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const createEnvironment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    try {
+      const result = await apiRequest<{ tenant: Tenant; user: { id: number; email: string } }>("/admin/environments", {
+        method: "POST",
+        body: JSON.stringify({
+          environmentName,
+          email: environmentEmail,
+          password: environmentPassword
+        })
+      });
+      setEnvironmentName("");
+      setEnvironmentEmail("");
+      setEnvironmentPassword("");
+      setUserTenantId(String(result.tenant.id));
       await loadTenants();
     } catch (err) {
       setError((err as Error).message);
@@ -212,6 +241,37 @@ export default function AdminPage() {
           <h2>Admin control room</h2>
           <p className="status">{user ? `Signed in as ${user.email}` : "Loading..."}</p>
           {error && <div className="notice">{error}</div>}
+        </div>
+
+        <div className="card">
+          <h3>Create environment</h3>
+          <p className="status">One button creates the tenant, the first customer login, and the environment record.</p>
+          <form className="stack" onSubmit={createEnvironment}>
+            <input
+              className="input"
+              placeholder="Environment name"
+              value={environmentName}
+              onChange={(event) => setEnvironmentName(event.target.value)}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Customer email / login"
+              value={environmentEmail}
+              onChange={(event) => setEnvironmentEmail(event.target.value)}
+              required
+            />
+            <input
+              className="input"
+              placeholder="Temporary password"
+              value={environmentPassword}
+              onChange={(event) => setEnvironmentPassword(event.target.value)}
+              required
+            />
+            <button className="button" type="submit">
+              Create environment
+            </button>
+          </form>
         </div>
 
         <div className="card">
@@ -402,6 +462,8 @@ export default function AdminPage() {
             <div className="stack" style={{ marginTop: 12 }}>
               <div className="status">Tool: {summary.toolName ?? "Report generator"}</div>
               <div className="status">Runs completed: {summary.totalRuns}</div>
+              <div className="status">Logins: {summary.loginCount ?? 0}</div>
+              <div className="status">Data used: {summary.dataUsedLabel ?? "0 B"}</div>
               <div className="status">
                 Savings model: {summary.timeSavedMinutes ?? "-"} min/run · {summary.hourlyRate ?? "-"} EUR/hr
               </div>

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import multer from "multer";
-import { pool } from "../db";
+import { pool, withTransaction } from "../db";
 import { requireAuth, requireRole } from "../middleware";
 import { putObject } from "../s3";
 import { guessMimeType, safeFilename, sha256 } from "../utils";
@@ -25,6 +25,24 @@ const tenantSchema = z.object({
   name: z.string().min(2)
 });
 
+const environmentSchema = z.object({
+  environmentName: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  role: z.enum(["ADMIN", "USER"]).optional().default("USER")
+});
+
+function formatBytes(bytes: number) {
+  if (!bytes) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / (1024 ** unitIndex);
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 router.post("/tenants", async (req, res, next) => {
   try {
     const { name } = tenantSchema.parse(req.body);
@@ -34,6 +52,43 @@ router.post("/tenants", async (req, res, next) => {
     );
     auditLog("tenant_created", { tenantId: result.rows[0].id, name, actorId: req.auth?.id });
     return res.json({ tenant: result.rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/environments", async (req, res, next) => {
+  try {
+    const { environmentName, email, password, role } = environmentSchema.parse(req.body);
+
+    const result = await withTransaction(async (client) => {
+      const tenantResult = await client.query(
+        "INSERT INTO tenants (name) VALUES ($1) RETURNING *",
+        [environmentName]
+      );
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const userResult = await client.query(
+        "INSERT INTO users (tenant_id, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, tenant_id, email, role, created_at",
+        [tenantResult.rows[0].id, email, passwordHash, role]
+      );
+
+      await client.query(
+        "INSERT INTO tenant_settings (tenant_id, updated_at) VALUES ($1, now()) ON CONFLICT (tenant_id) DO NOTHING",
+        [tenantResult.rows[0].id]
+      );
+
+      return { tenant: tenantResult.rows[0], user: userResult.rows[0] };
+    });
+
+    auditLog("environment_created", {
+      tenantId: result.tenant.id,
+      userId: result.user.id,
+      environmentName,
+      actorId: req.auth?.id
+    });
+
+    return res.status(201).json(result);
   } catch (error) {
     return next(error);
   }
@@ -96,6 +151,11 @@ router.post("/jars", upload.single("file"), async (req, res, next) => {
     const result = await pool.query(
       "INSERT INTO jars (tenant_id, name, version, storage_key, sha256, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
       [tenantId, name, version, storageKey, hash, req.auth?.id ?? null]
+    );
+
+    await pool.query(
+      "INSERT INTO tenant_settings (tenant_id, data_used_bytes, updated_at) VALUES ($1, $2, now()) ON CONFLICT (tenant_id) DO UPDATE SET data_used_bytes = tenant_settings.data_used_bytes + $2, updated_at = now()",
+      [tenantId, file.size]
     );
     auditLog("jar_uploaded", { jarId: result.rows[0].id, tenantId, actorId: req.auth?.id });
 
@@ -184,7 +244,7 @@ router.get("/tenants/:tenantId/summary", async (req, res, next) => {
   try {
     const tenantId = Number(req.params.tenantId);
     const settingsResult = await pool.query(
-      "SELECT ts.time_saved_minutes, ts.hourly_rate, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
+      "SELECT ts.time_saved_minutes, ts.hourly_rate, ts.login_count, ts.data_used_bytes, ts.last_login_at, j.name AS jar_name FROM tenant_settings ts LEFT JOIN jars j ON j.id = ts.active_jar_id WHERE ts.tenant_id = $1",
       [tenantId]
     );
     const settings = settingsResult.rows[0] ?? null;
@@ -202,12 +262,18 @@ router.get("/tenants/:tenantId/summary", async (req, res, next) => {
         ? Number(((totalRuns * timeSavedMinutes) / 60) * hourlyRate)
         : null;
 
+    const dataUsedBytes = Number(settings?.data_used_bytes ?? 0);
+
     return res.json({
       toolName: settings?.jar_name ?? null,
       totalRuns,
       timeSavedMinutes,
       hourlyRate,
-      moneySaved
+      moneySaved,
+      loginCount: settings?.login_count ?? 0,
+      dataUsedBytes,
+      dataUsedLabel: formatBytes(dataUsedBytes),
+      lastLoginAt: settings?.last_login_at ?? null
     });
   } catch (error) {
     return next(error);

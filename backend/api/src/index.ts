@@ -6,6 +6,7 @@ import { env, getAllowedOrigins } from "./env";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import reportRoutes from "./routes/reports";
+import contactsRoutes from "./routes/contacts";
 import { enforceOrigin } from "./middleware";
 
 const app = express();
@@ -50,7 +51,7 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
     maxAge: 600
   })
@@ -64,6 +65,7 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
 app.use("/reports", reportRoutes);
+app.use("/contacts", contactsRoutes);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const status = typeof err === "object" && err && "status" in err ? (err as { status?: number }).status ?? 500 : 500;

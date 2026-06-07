@@ -18,6 +18,16 @@ async function apiCall(path, options = {}) {
     });
 }
 
+function formatBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (value === 0) return '0 B';
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const unitIndex = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+    const size = value / (1024 ** unitIndex);
+    return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
 let allUsers = [];
 let allActivities = [];
 
@@ -430,7 +440,7 @@ function displayEnvironments(environments) {
     const tbody = document.getElementById('environmentsTableBody');
     
     if (environments.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-light);">Geen omgevingen gevonden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-light);">Geen omgevingen gevonden</td></tr>';
         return;
     }
 
@@ -448,8 +458,11 @@ function displayEnvironments(environments) {
                 <td><code>ENV-${env.id}</code></td>
                 <td>${env.username}</td>
                 <td>${env.company}</td>
+                <td><strong>${(env.type || 'general').toUpperCase()}</strong></td>
                 <td style="color: ${statusColor}; font-weight: 600;">${env.status.toUpperCase()}</td>
                 <td>${env.tools ? env.tools.length : 0} tools</td>
+                <td>${env.loginCount || 0}</td>
+                <td>${env.dataUsedLabel || formatBytes(env.dataUsedBytes || 0)}</td>
                 <td>${createdDate}</td>
                 <td>
                     <button class="btn btn-small" onclick="editEnvironment(${env.id})">Bewerken</button>
@@ -467,6 +480,10 @@ function setupEnvironmentModals() {
     const addEnvBtn = document.getElementById('addEnvBtn');
     const addEnvClose = document.getElementById('addEnvClose');
     const addEnvForm = document.getElementById('addEnvForm');
+    const addCustomerEnvModal = document.getElementById('addCustomerEnvModal');
+    const addCustomerEnvBtn = document.getElementById('addCustomerEnvBtn');
+    const addCustomerEnvClose = document.getElementById('addCustomerEnvClose');
+    const addCustomerEnvForm = document.getElementById('addCustomerEnvForm');
     
     const editEnvModal = document.getElementById('editEnvModal');
     const editEnvClose = document.getElementById('editEnvClose');
@@ -477,6 +494,10 @@ function setupEnvironmentModals() {
     if (!addEnvModal || !addEnvBtn || !addEnvClose || !addEnvForm) {
         console.log('Add environment modal elements not found');
         return;
+    }
+
+    if (!addCustomerEnvModal || !addCustomerEnvBtn || !addCustomerEnvClose || !addCustomerEnvForm) {
+        console.log('Add customer environment modal elements not found');
     }
     
     if (!editEnvModal || !editEnvClose || !editEnvForm || !deleteEnvBtn) {
@@ -501,6 +522,7 @@ function setupEnvironmentModals() {
             userId: document.getElementById('envUserId').value,
             name: document.getElementById('envName').value,
             description: document.getElementById('envDescription').value,
+            type: document.getElementById('envType').value,
             status: document.getElementById('envStatus').value
         };
 
@@ -529,6 +551,58 @@ function setupEnvironmentModals() {
         }
     });
 
+    if (addCustomerEnvModal && addCustomerEnvBtn && addCustomerEnvClose && addCustomerEnvForm) {
+        addCustomerEnvBtn.addEventListener('click', () => {
+            addCustomerEnvModal.style.display = 'flex';
+        });
+
+        addCustomerEnvClose.addEventListener('click', () => {
+            addCustomerEnvModal.style.display = 'none';
+        });
+
+        addCustomerEnvForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const customerEnv = {
+                company: document.getElementById('customerCompany').value,
+                name: document.getElementById('customerEnvName').value,
+                type: document.getElementById('customerEnvType').value,
+                username: document.getElementById('customerUsername').value,
+                email: document.getElementById('customerEmail').value,
+                password: document.getElementById('customerPassword').value,
+                description: document.getElementById('customerDescription').value,
+                status: document.getElementById('customerStatus').value
+            };
+
+            try {
+                const response = await apiCall('/api/customer-environments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(customerEnv)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`Klantomgeving aangemaakt: ${result.environment.name}\nLoginnaam: ${result.user.username}`);
+                    addCustomerEnvForm.reset();
+                    addCustomerEnvModal.style.display = 'none';
+                    await loadUsers();
+                    await loadEnvironments();
+                    await loadStats();
+                    await loadActivityLog();
+                } else {
+                    const error = await response.json();
+                    alert('Fout: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error creating customer environment:', error);
+                alert('Er is een fout opgetreden bij het aanmaken van de klantomgeving');
+            }
+        });
+    }
+
     // Edit environment modal
     editEnvClose.addEventListener('click', () => {
         editEnvModal.style.display = 'none';
@@ -541,6 +615,7 @@ function setupEnvironmentModals() {
         const updatedEnv = {
             name: document.getElementById('editEnvName').value,
             description: document.getElementById('editEnvDescription').value,
+            type: document.getElementById('editEnvType').value,
             status: document.getElementById('editEnvStatus').value
         };
 
@@ -600,6 +675,9 @@ function setupEnvironmentModals() {
     window.addEventListener('click', (e) => {
         if (e.target === addEnvModal) {
             addEnvModal.style.display = 'none';
+        }
+        if (addCustomerEnvModal && e.target === addCustomerEnvModal) {
+            addCustomerEnvModal.style.display = 'none';
         }
         if (e.target === editEnvModal) {
             editEnvModal.style.display = 'none';
@@ -762,6 +840,7 @@ async function editEnvironment(envId) {
             document.getElementById('editEnvId').value = env.id;
             document.getElementById('editEnvName').value = env.name;
             document.getElementById('editEnvDescription').value = env.description || '';
+            document.getElementById('editEnvType').value = env.type || 'general';
             document.getElementById('editEnvStatus').value = env.status;
             
             // Display tools list
@@ -774,6 +853,16 @@ async function editEnvironment(envId) {
                 ).join('');
             } else {
                 toolsList.innerHTML = '<p style="color: var(--text-light); font-size: 0.9rem;">Geen tools geïnstalleerd</p>';
+            }
+
+            const metricsCard = document.getElementById('envMetricsCard');
+            if (metricsCard) {
+                metricsCard.innerHTML = `
+                    <div class="info-row"><span class="info-label">Type:</span><span class="info-value">${(env.type || 'general').toUpperCase()}</span></div>
+                    <div class="info-row"><span class="info-label">Logins:</span><span class="info-value">${env.loginCount || 0}</span></div>
+                    <div class="info-row"><span class="info-label">Data Used:</span><span class="info-value">${env.dataUsedLabel || formatBytes(env.dataUsedBytes || 0)}</span></div>
+                    <div class="info-row"><span class="info-label">Laatste login:</span><span class="info-value">${env.lastLoginAt ? new Date(env.lastLoginAt).toLocaleString('nl-NL') : '-'}</span></div>
+                `;
             }
             
             // Display projects list

@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     if (user) {
         await loadEnvironmentDetails();
+        setupPasswordChangeForm();
     }
 });
 
@@ -40,7 +41,26 @@ function displayEnvironmentDetails(env) {
     document.getElementById('envName').textContent = env.name || env.environment;
     document.getElementById('envCompany').textContent = env.company;
     document.getElementById('envStatus').textContent = env.status;
+    const envType = document.getElementById('envType');
+    if (envType) {
+        envType.textContent = (env.type || 'general').toUpperCase();
+    }
     document.getElementById('envUptime').textContent = env.uptime;
+
+    const envLoginCount = document.getElementById('envLoginCount');
+    if (envLoginCount) {
+        envLoginCount.textContent = String(env.loginCount || 0);
+    }
+
+    const envDataUsed = document.getElementById('envDataUsed');
+    if (envDataUsed) {
+        envDataUsed.textContent = env.dataUsedLabel || '-';
+    }
+
+    const currentUsername = document.getElementById('currentUsername');
+    if (currentUsername) {
+        currentUsername.value = env.username || '';
+    }
 
     // Services list
     const servicesList = document.getElementById('servicesList');
@@ -81,4 +101,53 @@ function displayEnvironmentDetails(env) {
     if (savingsElement) {
         savingsElement.textContent = env.savingsDisplay || '-';
     }
+}
+
+function setupPasswordChangeForm() {
+    const form = document.getElementById('changePasswordForm');
+    if (!form) {
+        return;
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newUsername = document.getElementById('newUsername').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const currentUsername = document.getElementById('currentUsername');
+
+        try {
+            const response = await fetch(apiPath('/api/user/account'), {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ currentPassword, newUsername, newPassword })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                if (data.user && data.user.username) {
+                    if (currentUsername) {
+                        currentUsername.value = data.user.username;
+                    }
+                }
+                alert('Login details updated successfully');
+                form.reset();
+                if (data.user && data.user.username) {
+                    if (currentUsername) {
+                        currentUsername.value = data.user.username;
+                    }
+                }
+            } else {
+                alert(data.error || 'Could not update login details');
+            }
+        } catch (error) {
+            console.error('Error changing password:', error);
+            alert('Could not update login details');
+        }
+    });
 }
