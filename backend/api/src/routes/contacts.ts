@@ -170,7 +170,7 @@ router.patch("/customers/:customerId", async (req, res, next) => {
         "SELECT id FROM customers WHERE tenant_id = $1 AND lower(email) = $2 AND id <> $3 LIMIT 1",
         [tenantId, normalizedEmail, customerId]
       );
-      if (emailResult.rowCount > 0) {
+      if ((emailResult.rowCount ?? 0) > 0) {
         return res.status(409).json({ error: "Email already used by another customer" });
       }
     }
@@ -292,7 +292,7 @@ router.post("/import", async (req, res, next) => {
 
       let customerId: number;
 
-      if (existingCustomerResult.rowCount > 0) {
+      if ((existingCustomerResult.rowCount ?? 0) > 0) {
         customerId = Number(existingCustomerResult.rows[0].id);
         await client.query(
           "UPDATE customers SET name = $1, company = COALESCE($2, company), email = COALESCE($3, email), phone = COALESCE($4, phone), updated_at = now() WHERE id = $5 AND tenant_id = $6",
