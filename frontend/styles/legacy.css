@@ -7,6 +7,20 @@
 
 :root {
     --primary-color: #00d4ff;
+    --primary-dark: #0099cc;
+    --secondary-color: #1a2a4a;
+    --accent-color: #ff006e;
+    --success-color: #00d084;
+    --danger-color: #ff004e;
+    --warning-color: #ffa500;
+    --dark-bg: #0f1419;
+    --light-bg: #1a1f2e;
+    --card-bg: #16212b;
+    --border-color: #2a3f5f;
+    --text-color: #e8eef7;
+    --text-light: #a4afc1;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 /* ===== Next.js App Utility Classes ===== */
 main {
@@ -506,20 +520,6 @@ select.input {
         grid-template-columns: 1fr;
     }
 }
-    --primary-dark: #0099cc;
-    --secondary-color: #1a2a4a;
-    --accent-color: #ff006e;
-    --success-color: #00d084;
-    --danger-color: #ff004e;
-    --warning-color: #ffa500;
-    --dark-bg: #0f1419;
-    --light-bg: #1a1f2e;
-    --card-bg: #16212b;
-    --border-color: #2a3f5f;
-    --text-color: #e8eef7;
-    --text-light: #a4afc1;
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
@@ -646,6 +646,17 @@ code {
 
 .nav-link:hover {
     color: var(--primary-color);
+}
+
+.nav-link-button {
+    border: none;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.nav-link-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 .nav-link::after {

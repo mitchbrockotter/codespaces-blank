@@ -1,37 +1,6 @@
 import * as React from "react";
 import { useRouter } from "next/router";
-import { apiRequest, API_BASE, ApiUser } from "../lib/api";
-
-type JobResponse = {
-  job: {
-    id: number;
-    status: "queued" | "running" | "done" | "failed";
-    progress: number;
-    error_message?: string | null;
-  };
-  report: {
-    id: number;
-    filename: string;
-    mime_type: string;
-    size_bytes: number;
-  } | null;
-};
-
-type SummaryResponse = {
-  toolName: string | null;
-  totalRuns: number;
-  timeSavedMinutes: number | null;
-  hourlyRate: number | null;
-  moneySaved: number | null;
-  loginCount?: number;
-  dataUsedBytes?: number;
-  dataUsedLabel?: string;
-};
-
-type UsagePoint = {
-  day: string;
-  runs: number;
-};
+import { apiRequest, ApiUser } from "../lib/api";
 
 type ContactCustomer = {
   id: number;
@@ -197,19 +166,60 @@ function parseImportRows(text: string): ContactImportRow[] {
   return rows;
 }
 
+function normalizeObjectValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return String(value).trim();
+}
+
+function parseRowsFromObjects(rows: Record<string, unknown>[]): ContactImportRow[] {
+  if (!rows.length) {
+    return [];
+  }
+
+  const parsed: ContactImportRow[] = [];
+
+  for (const rawRow of rows) {
+    const normalizedRow: Record<string, string> = {};
+    Object.entries(rawRow).forEach(([key, value]) => {
+      normalizedRow[normalizeHeader(key)] = normalizeObjectValue(value);
+    });
+
+    const name = normalizedRow.name || normalizedRow.naam || normalizedRow.customer || normalizedRow.klant;
+    if (!name) {
+      continue;
+    }
+
+    const contactedAtRaw =
+      normalizedRow.contactedat ||
+      normalizedRow.laatstecontact ||
+      normalizedRow.contactdatum ||
+      normalizedRow.datum ||
+      "";
+
+    parsed.push({
+      name,
+      company: normalizedRow.company || normalizedRow.bedrijf || undefined,
+      email: normalizedRow.email || normalizedRow.mail || undefined,
+      phone: normalizedRow.phone || normalizedRow.telefoon || normalizedRow.gsm || normalizedRow.mobiel || undefined,
+      contactedAt: contactedAtRaw ? parseContactDate(contactedAtRaw) : undefined,
+      contactMethod: normalizedRow.contactmethod || normalizedRow.methode || normalizedRow.kanaal || normalizedRow.method || undefined,
+      summary: normalizedRow.summary || normalizedRow.notitie || normalizedRow.notes || normalizedRow.omschrijving || undefined
+    });
+  }
+
+  return parsed;
+}
+
 export default function AppPage() {
   const router = useRouter();
   const [user, setUser] = React.useState<ApiUser | null>(null);
-  const [jobId, setJobId] = React.useState<number | null>(null);
-  const [jobStatus, setJobStatus] = React.useState<JobResponse["job"] | null>(null);
-  const [report, setReport] = React.useState<JobResponse["report"] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [downloaded, setDownloaded] = React.useState(false);
-  const [summary, setSummary] = React.useState<SummaryResponse | null>(null);
-  const [usage, setUsage] = React.useState<UsagePoint[]>([]);
-  const [currentPassword, setCurrentPassword] = React.useState("");
-  const [newEmail, setNewEmail] = React.useState("");
-  const [newPassword, setNewPassword] = React.useState("");
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [contactsOverview, setContactsOverview] = React.useState<ContactsOverviewResponse | null>(null);
   const [followUpDays, setFollowUpDays] = React.useState(14);
   const [newCustomerName, setNewCustomerName] = React.useState("");
@@ -235,8 +245,11 @@ export default function AppPage() {
   const [eventSummary, setEventSummary] = React.useState("");
   const [eventDateTime, setEventDateTime] = React.useState("");
   const [importText, setImportText] = React.useState("");
+  const [importRowsFromFile, setImportRowsFromFile] = React.useState<ContactImportRow[]>([]);
   const [importInfo, setImportInfo] = React.useState<string | null>(null);
-  const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const [currentPassword, setCurrentPassword] = React.useState("");
+  const [newEmail, setNewEmail] = React.useState("");
+  const [newPassword, setNewPassword] = React.useState("");
 
   const loadContactsOverview = React.useCallback(async (days = followUpDays) => {
     const data = await apiRequest<ContactsOverviewResponse>(`/contacts/customers?followUpDays=${days}`);
@@ -248,96 +261,40 @@ export default function AppPage() {
 
   React.useEffect(() => {
     apiRequest<{ user: ApiUser }>("/auth/me")
-      .then(({ user }) => {
-        if (user.role === "ADMIN") {
+      .then(({ user: authenticatedUser }) => {
+        if (authenticatedUser.role === "ADMIN") {
           router.replace("/admin");
-        } else {
-          setUser(user);
-          apiRequest<SummaryResponse>("/reports/summary")
-            .then((data) => setSummary(data))
-            .catch(() => setSummary(null));
-          apiRequest<{ points: UsagePoint[] }>("/reports/usage")
-            .then((data) => setUsage(data.points))
-            .catch(() => setUsage([]));
-          apiRequest<ContactsAccessResponse>("/contacts/access")
-            .then((access) => {
-              setContactsEnabled(access.enabled);
-              if (access.enabled) {
-                return loadContactsOverview();
-              }
-              setContactsOverview(null);
-              return Promise.resolve();
-            })
-            .catch(() => {
-              setContactsEnabled(false);
-              setContactsOverview(null);
-            });
+          return;
         }
+
+        setUser(authenticatedUser);
+        apiRequest<ContactsAccessResponse>("/contacts/access")
+          .then((access) => {
+            setContactsEnabled(access.enabled);
+            if (!access.enabled) {
+              setContactsOverview(null);
+              return;
+            }
+            loadContactsOverview().catch(() => setContactsOverview(null));
+          })
+          .catch(() => {
+            setContactsEnabled(false);
+            setContactsOverview(null);
+          });
       })
       .catch(() => router.replace("/login"));
   }, [router, loadContactsOverview]);
 
-  React.useEffect(() => {
-    if (!jobId) {
-      return;
-    }
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await apiRequest<JobResponse>(`/reports/jobs/${jobId}`);
-        setJobStatus(data.job);
-        setReport(data.report);
-        if (data.job.status === "done" || data.job.status === "failed") {
-          if (pollRef.current) {
-            clearInterval(pollRef.current);
-          }
-          if (data.job.status === "done") {
-            apiRequest<SummaryResponse>("/reports/summary")
-              .then((summary) => setSummary(summary))
-              .catch(() => setSummary(null));
-            apiRequest<{ points: UsagePoint[] }>("/reports/usage")
-              .then((data) => setUsage(data.points))
-              .catch(() => setUsage([]));
-          }
-        }
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    }, 2000);
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-      }
-    };
-  }, [jobId]);
-
-  const runReport = async () => {
+  const logout = async () => {
     setError(null);
-    setDownloaded(false);
-    setReport(null);
-    setJobStatus(null);
+    setIsLoggingOut(true);
     try {
-      const data = await apiRequest<{ jobId: number }>("/reports/run", { method: "POST" });
-      setJobId(data.jobId);
+      await apiRequest<{ ok: true }>("/auth/logout", { method: "POST" });
+      router.replace("/login");
     } catch (err) {
       setError((err as Error).message);
-    }
-  };
-
-  const downloadReport = async () => {
-    if (!jobId) {
-      return;
-    }
-    setError(null);
-    try {
-      const data = await apiRequest<{ token: string }>(`/reports/jobs/${jobId}/download-token`, {
-        method: "POST"
-      });
-      setDownloaded(true);
-      window.location.href = `${API_BASE}/reports/download/${data.token}`;
-    } catch (err) {
-      setError((err as Error).message);
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -518,12 +475,55 @@ export default function AppPage() {
       return;
     }
 
+    setError(null);
+    setImportInfo(null);
+
     try {
+      const lowerName = file.name.toLowerCase();
+
+      if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+        const xlsx = await import("xlsx");
+        const workbook = xlsx.read(await file.arrayBuffer(), {
+          type: "array",
+          cellDates: true
+        });
+
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          setError("Import mislukt: Excel-bestand bevat geen sheet");
+          setImportRowsFromFile([]);
+          return;
+        }
+
+        const rawRows = xlsx.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
+          defval: ""
+        }) as Record<string, unknown>[];
+        const parsedRows = parseRowsFromObjects(rawRows);
+
+        if (!parsedRows.length) {
+          setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
+          setImportRowsFromFile([]);
+          return;
+        }
+
+        setImportRowsFromFile(parsedRows);
+        setImportText("");
+        setImportInfo(`Excel-bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`);
+        return;
+      }
+
       const text = await file.text();
+      const parsedRows = parseImportRows(text);
       setImportText(text);
-      setImportInfo(`Bestand ${file.name} geladen. Controleer de data en klik op importeren.`);
+      setImportRowsFromFile(parsedRows);
+      if (parsedRows.length) {
+        setImportInfo(`Bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`);
+      } else {
+        setImportInfo(`Bestand ${file.name} geladen. Controleer de data en klik op importeren.`);
+      }
     } catch (err) {
       setError((err as Error).message);
+      setImportRowsFromFile([]);
     }
   };
 
@@ -532,7 +532,9 @@ export default function AppPage() {
     setError(null);
     setImportInfo(null);
 
-    const rows = parseImportRows(importText);
+    const typedRows = importText.trim() ? parseImportRows(importText) : [];
+    const rows = typedRows.length ? typedRows : importRowsFromFile;
+
     if (!rows.length) {
       setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
       return;
@@ -553,20 +555,17 @@ export default function AppPage() {
       setImportInfo(
         `${result.importedRows} regels verwerkt: ${result.createdCustomers} nieuwe klanten, ${result.updatedCustomers} bijgewerkt, ${result.createdEvents} contactmomenten toegevoegd.`
       );
+      setImportText("");
+      setImportRowsFromFile([]);
       await loadContactsOverview();
     } catch (err) {
       setError((err as Error).message);
     }
   };
 
-  const moneySaved = summary?.moneySaved !== null && summary?.moneySaved !== undefined
-    ? summary.moneySaved.toFixed(2)
-    : null;
-
-  const maxRuns = usage.reduce((max: number, point: UsagePoint) => Math.max(max, point.runs), 0);
   const environmentLabel = "Merlijn Meubels omgeving";
-
-  const lastSevenDays = usage.slice(-7);
+  const allCustomers = contactsOverview?.customers ?? [];
+  const followUpCustomers = allCustomers.filter((customer) => customer.needsFollowUp);
   const showOverview = activeSection === "overzicht";
   const showCustomers = activeSection === "klanten";
   const showFollowUp = activeSection === "opvolging";
@@ -574,504 +573,542 @@ export default function AppPage() {
   const showAccount = activeSection === "account";
 
   return (
-    <main className="workspace-shell">
-      <section className="workspace-hero">
-        <div className="workspace-hero-copy">
-          <div className="badge">Afgeschermde klantomgeving</div>
-          <h1>{environmentLabel}</h1>
-          <p className="workspace-lead">
-            Een vertrouwde werkomgeving om het handmatige Excel-proces te vervangen door een veilige en overzichtelijke workflow.
-          </p>
-          <div className="workspace-meta">
-            <span>{user ? `Ingelogd als ${user.email}` : "Account laden..."}</span>
-            <span>Beveiligde omgeving</span>
-            <span>Alleen voor Merlijn Meubels</span>
+    <>
+      <nav className="navbar">
+        <div className="navbar-container">
+          <div className="navbar-left">
+            <a href="/" className="navbar-brand">
+              <img src="/images/logo.png" alt="P&K Backend Automation Logo" className="navbar-logo" />
+              <span>P&K Backend Automation</span>
+            </a>
+          </div>
+          <div className="navbar-right">
+            <a href="/" className="nav-link">Home</a>
+            <a href="/contact" className="nav-link">Contact</a>
+            {user ? <span className="user-display">Ingelogd als {user.email}</span> : null}
+            <button className="nav-link nav-login nav-link-button" type="button" onClick={logout} disabled={isLoggingOut}>
+              {isLoggingOut ? "Uitloggen..." : "Uitloggen"}
+            </button>
           </div>
         </div>
+      </nav>
 
-        <div className="workspace-hero-panel">
-          <div className="workspace-panel-label">Live overzicht</div>
-          <div className="workspace-panel-value">{summary?.toolName ?? "Omgeving gereed"}</div>
-          <div className="workspace-panel-subtitle">{jobStatus ? `Huidige status: ${jobStatus.status}` : "Geen run actief"}</div>
-          <div className="workspace-panel-stats">
-            <div>
-              <strong>{summary?.totalRuns ?? 0}</strong>
-              <span>Afgeronde runs</span>
-            </div>
-            <div>
-              <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
-              <span>Klanten</span>
-            </div>
-            <div>
-              <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
-              <span>Opvolging nodig</span>
+      <main className="workspace-shell">
+        <section className="workspace-hero">
+          <div className="workspace-hero-copy">
+            <div className="badge">Afgeschermde klantomgeving</div>
+            <h1>{environmentLabel}</h1>
+            <p className="workspace-lead">
+              Een vertrouwde werkomgeving om klantinformatie, opvolging en import centraal te beheren.
+            </p>
+            <div className="workspace-meta">
+              <span>{user ? `Ingelogd als ${user.email}` : "Account laden..."}</span>
+              <span>Beveiligde omgeving</span>
+              <span>Alleen voor Merlijn Meubels</span>
             </div>
           </div>
-        </div>
-      </section>
 
-      <section className="workspace-nav">
-        <button className={`workspace-nav-button ${showOverview ? "active" : ""}`} type="button" onClick={() => setActiveSection("overzicht")}>Overzicht</button>
-        {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klanten</button> : null}
-        {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Opvolging</button> : null}
-        {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Import</button> : null}
-        <button className={`workspace-nav-button ${showAccount ? "active" : ""}`} type="button" onClick={() => setActiveSection("account")}>Profiel</button>
-      </section>
-
-      <section className="workspace-grid">
-        {showOverview ? (
-        <article className="workspace-card workspace-card-primary">
-          <div className="card eyebrow">Hoofdactie</div>
-          <h2>Start het proces</h2>
-          <p>
-            Start de geautomatiseerde flow op het moment dat je normaal in Excel zou werken.
-          </p>
-          <div className="stack">
-            <button className="button button-strong" onClick={runReport} disabled={!user}>
-              Rapport genereren
-            </button>
-            <button
-              className="button button-secondary"
-              onClick={downloadReport}
-              disabled={!report || downloaded || jobStatus?.status !== "done"}
-            >
-              {downloaded ? "Gedownload" : "Downloaden (eenmalig)"}
-            </button>
-          </div>
-          <div className="workspace-inline-status">
-            <span>Status</span>
-            <strong>{jobStatus ? jobStatus.status : "inactief"}</strong>
-          </div>
-          {report && (
-            <div className="status">Bestand: {report.filename} ({Math.round(report.size_bytes / 1024)} KB)</div>
-          )}
-          {downloaded && <div className="status">Gedownload. Genereer opnieuw om nogmaals te downloaden.</div>}
-          {jobStatus?.status === "failed" && jobStatus.error_message && (
-            <div className="notice">{jobStatus.error_message}</div>
-          )}
-        </article>
-        ) : null}
-
-        {showAccount ? (
-        <aside className="workspace-card workspace-card-side">
-          <div className="card eyebrow">Account</div>
-          <h3>Inloggegevens wijzigen</h3>
-          <p>Pas je e-mail of wachtwoord aan wanneer dat nodig is.</p>
-          <form className="stack" onSubmit={updateAccount}>
-            <input
-              className="input"
-              type="password"
-              placeholder="Huidig wachtwoord"
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              required
-            />
-            <input
-              className="input"
-              type="email"
-              placeholder="Nieuw e-mailadres"
-              value={newEmail}
-              onChange={(event) => setNewEmail(event.target.value)}
-            />
-            <input
-              className="input"
-              type="password"
-              placeholder="Nieuw wachtwoord"
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              minLength={8}
-            />
-            <button className="button" type="submit">
-              Inloggegevens opslaan
-            </button>
-          </form>
-        </aside>
-        ) : null}
-
-        {showOverview ? (
-        <article className="workspace-card">
-          <div className="card eyebrow">Resultaat</div>
-          <h3>Gebruik en besparing</h3>
-          <div className="workspace-metrics">
-            <div>
-              <span>Runs</span>
-              <strong>{summary?.totalRuns ?? 0}</strong>
-            </div>
-            <div>
-              <span>Besparing</span>
-              <strong>{moneySaved ? `EUR ${moneySaved}` : "-"}</strong>
-            </div>
-            <div>
-              <span>Klanten</span>
-              <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+          <div className="workspace-hero-panel">
+            <div className="workspace-panel-label">Live overzicht</div>
+            <div className="workspace-panel-value">Omgeving gereed</div>
+            <div className="workspace-panel-subtitle">Klantbeheer en import zijn beschikbaar</div>
+            <div className="workspace-panel-stats">
+              <div>
+                <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+                <span>Klanten</span>
+              </div>
+              <div>
+                <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
+                <span>Opvolging nodig</span>
+              </div>
+              <div>
+                <strong>{contactsOverview?.followUpDays ?? followUpDays}</strong>
+                <span>Dagen termijn</span>
+              </div>
             </div>
           </div>
-          {summary && (
-            <div className="status">Actieve tool: {summary.toolName ?? "Rapport generator"}</div>
-          )}
-        </article>
-        ) : null}
+        </section>
 
-        {showOverview ? (
-        <article className="workspace-card">
-          <div className="card eyebrow">Trend</div>
-          <h3>Laatste 7 dagen</h3>
-          <p className="status">Recente activiteit in deze omgeving.</p>
-          {lastSevenDays.length > 0 ? (
-            <div className="trend-chart">
-              {lastSevenDays.map((point) => (
-                <div key={point.day} className="trend-column">
-                  <div
-                    className="trend-bar"
-                    style={{ height: maxRuns > 0 ? `${Math.max(14, Math.round((point.runs / maxRuns) * 100))}%` : "14%" }}
-                    title={`${point.day}: ${point.runs} runs`}
-                  />
-                  <span>{point.day.slice(5)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="status">Nog geen gebruik geregistreerd.</div>
-          )}
-        </article>
-        ) : null}
+        <section className="workspace-nav">
+          <button className={`workspace-nav-button ${showOverview ? "active" : ""}`} type="button" onClick={() => setActiveSection("overzicht")}>Overzicht</button>
+          {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klanten</button> : null}
+          {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Opvolging</button> : null}
+          {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Import</button> : null}
+          <button className={`workspace-nav-button ${showAccount ? "active" : ""}`} type="button" onClick={() => setActiveSection("account")}>Profiel</button>
+        </section>
 
-        {showCustomers ? (
-          contactsEnabled ? (
-            <article className="workspace-card workspace-card-wide">
-              <div className="card eyebrow">Klantbeheer</div>
-              <h3>Contactmomenten registreren</h3>
-              <p className="status">
-                Voeg klanten toe en registreer contactmomenten handmatig. Opvolging wordt daarna automatisch berekend.
+        <section className="workspace-grid">
+          {showOverview ? (
+            <article className="workspace-card workspace-card-primary">
+              <div className="card eyebrow">Hoofdactie</div>
+              <h2>Start met klantbeheer</h2>
+              <p>
+                Voeg direct een klant toe, registreer contactmomenten en houd opvolging centraal bij in deze omgeving.
               </p>
-
-              <div className="workspace-split">
-                <div className="stack">
-                  <h4>Nieuwe klant</h4>
-                  <p className="status">Open het venster om een klant met alle gegevens toe te voegen.</p>
-                  <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>
-                    Klant toevoegen
-                  </button>
-                </div>
-
-                <form className="stack" onSubmit={registerContactEvent}>
-                  <h4>Contact registreren</h4>
-                  <select
-                    className="input"
-                    value={eventCustomerId}
-                    onChange={(entry) => setEventCustomerId(entry.target.value)}
-                    required
-                  >
-                    {contactsOverview?.customers.length ? (
-                      contactsOverview.customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>{customer.name}</option>
-                      ))
-                    ) : (
-                      <option value="">Nog geen klanten</option>
-                    )}
-                  </select>
-                  <select
-                    className="input"
-                    value={eventMethod}
-                    onChange={(entry) => setEventMethod(entry.target.value)}
-                  >
-                    <option>Telefoon</option>
-                    <option>Email</option>
-                    <option>WhatsApp</option>
-                    <option>Op locatie</option>
-                    <option>Overig</option>
-                  </select>
-                  <input
-                    className="input"
-                    type="datetime-local"
-                    value={eventDateTime}
-                    onChange={(entry) => setEventDateTime(entry.target.value)}
-                  />
-                  <textarea
-                    className="input"
-                    placeholder="Korte notitie over het contact"
-                    value={eventSummary}
-                    onChange={(entry) => setEventSummary(entry.target.value)}
-                    rows={3}
-                  />
-                  <button className="button" type="submit" disabled={!contactsOverview?.customers.length}>Contact opslaan</button>
-                </form>
+              <div className="stack">
+                <button className="button button-strong" type="button" onClick={() => setActiveSection("klanten")}>Ga naar klanten</button>
+                <button className="button button-secondary" type="button" onClick={() => setActiveSection("import")}>Open import</button>
+              </div>
+              <div className="workspace-inline-status">
+                <span>Status</span>
+                <strong>Klaar voor gebruik</strong>
               </div>
             </article>
-          ) : (
-            <article className="workspace-card workspace-card-wide">
-              <div className="card eyebrow">Klantbeheer</div>
-              <h3>Contactmodule niet actief</h3>
-              <p className="status">Deze module is alleen beschikbaar in de omgeving van Merlijn Meubels.</p>
+          ) : null}
+
+          {showOverview ? (
+            <article className="workspace-card workspace-card-side">
+              <div className="card eyebrow">Resultaat</div>
+              <h3>Stand van zaken</h3>
+              <div className="workspace-metrics">
+                <div>
+                  <span>Totaal klanten</span>
+                  <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Opvolging nodig</span>
+                  <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Termijn</span>
+                  <strong>{contactsOverview?.followUpDays ?? followUpDays} dgn</strong>
+                </div>
+              </div>
+              <p className="status">Rapportgeneratie is verwijderd voor deze omgeving.</p>
             </article>
-          )
-        ) : null}
+          ) : null}
 
-        {contactsEnabled && showImport ? (
-        <article className="workspace-card workspace-card-wide">
-          <div className="card eyebrow">Excel import</div>
-          <h3>Bestaande Excel data importeren</h3>
-          <p className="status">
-            Verplichte kolom: Name of Naam. Optioneel: Company/Bedrijf, Email, Phone/Telefoon, ContactedAt/Datum, ContactMethod/Methode, Summary/Notitie.
-          </p>
-          <form className="stack workspace-import" onSubmit={importRows}>
-            <input className="input" type="file" accept=".csv,.txt" onChange={onImportFilePicked} />
-            <textarea
-              className="input"
-              rows={8}
-              value={importText}
-              onChange={(entry) => setImportText(entry.target.value)}
-              placeholder={"Name,Company,Email,ContactedAt,ContactMethod,Summary\nJan Jansen,Merlijn Meubels,jan@example.nl,2026-06-01 10:30,Telefoon,Interesse in offerte"}
-            />
-            <button className="button" type="submit">Regels importeren</button>
-            {importInfo ? <div className="status">{importInfo}</div> : null}
-          </form>
-        </article>
-        ) : null}
+          {showCustomers ? (
+            contactsEnabled ? (
+              <article className="workspace-card workspace-card-wide">
+                <div className="card eyebrow">Klantbeheer</div>
+                <h3>Klanten en contactmomenten</h3>
+                <p className="status">
+                  Voeg klanten toe, registreer contactmomenten en beheer alle gegevens in één overzicht.
+                </p>
 
-        {contactsEnabled && showFollowUp ? (
-        <article className="workspace-card workspace-card-wide">
-          <div className="card eyebrow">Opvolging</div>
-          <h3>Welke klanten hebben opvolging nodig?</h3>
-          <form className="workspace-follow-up-filter" onSubmit={updateFollowUpWindow}>
-            <label className="status" htmlFor="follow-up-days">Opvolging na aantal dagen zonder contact</label>
-            <input
-              id="follow-up-days"
-              className="input"
-              type="number"
-              min={1}
-              max={120}
-              value={followUpDays}
-              onChange={(entry) => setFollowUpDays(Number(entry.target.value) || 14)}
-            />
-            <button className="button" type="submit">Verversen</button>
-          </form>
+                <div className="workspace-split">
+                  <div className="stack">
+                    <h4>Nieuwe klant</h4>
+                    <p className="status">Open het venster om een klant met alle gegevens toe te voegen.</p>
+                    <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>
+                      Klant toevoegen
+                    </button>
+                  </div>
 
-          <div className="workspace-metrics" style={{ marginTop: 10 }}>
-            <div>
-              <span>Totaal klanten</span>
-              <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
-            </div>
-            <div>
-              <span>Opvolging nodig</span>
-              <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
-            </div>
-            <div>
-              <span>Termijn</span>
-              <strong>{contactsOverview?.followUpDays ?? followUpDays} dagen</strong>
-            </div>
-          </div>
+                  <form className="stack" onSubmit={registerContactEvent}>
+                    <h4>Contact registreren</h4>
+                    <select
+                      className="input"
+                      value={eventCustomerId}
+                      onChange={(entry) => setEventCustomerId(entry.target.value)}
+                      required
+                    >
+                      {allCustomers.length ? (
+                        allCustomers.map((customer) => (
+                          <option key={customer.id} value={customer.id}>{customer.name}</option>
+                        ))
+                      ) : (
+                        <option value="">Nog geen klanten</option>
+                      )}
+                    </select>
+                    <select
+                      className="input"
+                      value={eventMethod}
+                      onChange={(entry) => setEventMethod(entry.target.value)}
+                    >
+                      <option>Telefoon</option>
+                      <option>Email</option>
+                      <option>WhatsApp</option>
+                      <option>Op locatie</option>
+                      <option>Overig</option>
+                    </select>
+                    <input
+                      className="input"
+                      type="datetime-local"
+                      value={eventDateTime}
+                      onChange={(entry) => setEventDateTime(entry.target.value)}
+                    />
+                    <textarea
+                      className="input"
+                      placeholder="Korte notitie over het contact"
+                      value={eventSummary}
+                      onChange={(entry) => setEventSummary(entry.target.value)}
+                      rows={3}
+                    />
+                    <button className="button" type="submit" disabled={!allCustomers.length}>Contact opslaan</button>
+                  </form>
+                </div>
 
-          <div className="workspace-table-wrap">
-            <table className="workspace-table">
-              <thead>
-                <tr>
-                  <th>Klant</th>
-                  <th>Laatste contact</th>
-                  <th>Dagen geleden</th>
-                  <th>Status</th>
-                  <th>Actie</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contactsOverview?.customers.length ? (
-                  contactsOverview.customers.map((customer) => (
-                    <tr key={customer.id}>
-                      <td>
-                        <strong>{customer.name}</strong>
-                        {customer.company ? <div className="status">{customer.company}</div> : null}
-                      </td>
-                      <td>
-                        {customer.lastContactAt
-                          ? new Date(customer.lastContactAt).toLocaleString()
-                          : "Nog geen contact geregistreerd"}
-                      </td>
-                      <td>{customer.daysSinceLastContact ?? "-"}</td>
-                      <td>
-                        <span className={customer.needsFollowUp ? "tag tag-alert" : "tag"}>
-                          {customer.needsFollowUp ? "Opvolging nodig" : "Bijgewerkt"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="workspace-actions">
-                          <button className="button button-secondary button-small" type="button" onClick={() => openEditCustomerModal(customer)}>
-                            Bewerken
-                          </button>
-                          <button className="button button-danger button-small" type="button" onClick={() => openDeleteCustomerModal(customer)}>
-                            Verwijderen
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5}>Nog geen klanten toegevoegd.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-        ) : null}
-      </section>
+                <div className="workspace-table-wrap">
+                  <table className="workspace-table">
+                    <thead>
+                      <tr>
+                        <th>Klant</th>
+                        <th>Contact</th>
+                        <th>Laatste contact</th>
+                        <th>Status</th>
+                        <th>Actie</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allCustomers.length ? (
+                        allCustomers.map((customer) => (
+                          <tr key={customer.id}>
+                            <td>
+                              <strong>{customer.name}</strong>
+                              {customer.company ? <div className="status">{customer.company}</div> : null}
+                            </td>
+                            <td>
+                              {customer.email ? <div className="status">{customer.email}</div> : null}
+                              {customer.phone ? <div className="status">{customer.phone}</div> : null}
+                              {!customer.email && !customer.phone ? "-" : null}
+                            </td>
+                            <td>
+                              {customer.lastContactAt
+                                ? new Date(customer.lastContactAt).toLocaleString()
+                                : "Nog geen contact geregistreerd"}
+                            </td>
+                            <td>
+                              <span className={customer.needsFollowUp ? "tag tag-alert" : "tag"}>
+                                {customer.needsFollowUp ? "Opvolging nodig" : "Bijgewerkt"}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="workspace-actions">
+                                <button className="button button-secondary button-small" type="button" onClick={() => openEditCustomerModal(customer)}>
+                                  Bewerken
+                                </button>
+                                <button className="button button-danger button-small" type="button" onClick={() => openDeleteCustomerModal(customer)}>
+                                  Verwijderen
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5}>Nog geen klanten toegevoegd.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            ) : (
+              <article className="workspace-card workspace-card-wide">
+                <div className="card eyebrow">Klantbeheer</div>
+                <h3>Contactmodule niet actief</h3>
+                <p className="status">Deze module is alleen beschikbaar in de omgeving van Merlijn Meubels.</p>
+              </article>
+            )
+          ) : null}
 
-      {isCreateCustomerModalOpen ? (
-        <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Nieuwe klant toevoegen">
-          <div className="workspace-modal-content">
-            <div className="workspace-modal-header">
-              <h3>Nieuwe klant toevoegen</h3>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => setIsCreateCustomerModalOpen(false)}
-              >
-                Sluiten
-              </button>
-            </div>
-
-            <form className="stack" onSubmit={createCustomer}>
-              <input
-                className="input"
-                type="text"
-                placeholder="Naam klant"
-                value={newCustomerName}
-                onChange={(entry) => setNewCustomerName(entry.target.value)}
-                required
-              />
-              <input
-                className="input"
-                type="text"
-                placeholder="Bedrijf"
-                value={newCustomerCompany}
-                onChange={(entry) => setNewCustomerCompany(entry.target.value)}
-              />
-              <input
-                className="input"
-                type="email"
-                placeholder="E-mail"
-                value={newCustomerEmail}
-                onChange={(entry) => setNewCustomerEmail(entry.target.value)}
-              />
-              <input
-                className="input"
-                type="text"
-                placeholder="Telefoon"
-                value={newCustomerPhone}
-                onChange={(entry) => setNewCustomerPhone(entry.target.value)}
-              />
-
-              <h4>Eerste contact (optioneel)</h4>
-              <select
-                className="input"
-                value={newCustomerInitialMethod}
-                onChange={(entry) => setNewCustomerInitialMethod(entry.target.value)}
-              >
-                <option>Telefoon</option>
-                <option>Email</option>
-                <option>WhatsApp</option>
-                <option>Op locatie</option>
-                <option>Overig</option>
-              </select>
-              <input
-                className="input"
-                type="datetime-local"
-                value={newCustomerInitialDateTime}
-                onChange={(entry) => setNewCustomerInitialDateTime(entry.target.value)}
-              />
-              <textarea
-                className="input"
-                rows={3}
-                placeholder="Notitie eerste contact"
-                value={newCustomerInitialSummary}
-                onChange={(entry) => setNewCustomerInitialSummary(entry.target.value)}
-              />
-
-              <button className="button" type="submit">Klant opslaan</button>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {isEditCustomerModalOpen ? (
-        <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Klant bewerken">
-          <div className="workspace-modal-content">
-            <div className="workspace-modal-header">
-              <h3>Klant bewerken</h3>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => setIsEditCustomerModalOpen(false)}
-              >
-                Sluiten
-              </button>
-            </div>
-
-            <form className="stack" onSubmit={updateCustomer}>
-              <input
-                className="input"
-                type="text"
-                placeholder="Naam klant"
-                value={editCustomerName}
-                onChange={(entry) => setEditCustomerName(entry.target.value)}
-                required
-              />
-              <input
-                className="input"
-                type="text"
-                placeholder="Bedrijf"
-                value={editCustomerCompany}
-                onChange={(entry) => setEditCustomerCompany(entry.target.value)}
-              />
-              <input
-                className="input"
-                type="email"
-                placeholder="E-mail"
-                value={editCustomerEmail}
-                onChange={(entry) => setEditCustomerEmail(entry.target.value)}
-              />
-              <input
-                className="input"
-                type="text"
-                placeholder="Telefoon"
-                value={editCustomerPhone}
-                onChange={(entry) => setEditCustomerPhone(entry.target.value)}
-              />
-              <button className="button" type="submit">Wijzigingen opslaan</button>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {isDeleteCustomerModalOpen ? (
-        <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Klant verwijderen">
-          <div className="workspace-modal-content">
-            <div className="workspace-modal-header">
-              <h3>Klant verwijderen</h3>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => {
-                  setIsDeleteCustomerModalOpen(false);
-                  setDeletingCustomer(null);
-                }}
-              >
-                Annuleren
-              </button>
-            </div>
-
-            <form className="stack" onSubmit={deleteCustomer}>
-              <p>
-                Weet je zeker dat je <strong>{deletingCustomer?.name ?? "deze klant"}</strong> wilt verwijderen?
-                Alle gekoppelde contactmomenten worden ook verwijderd.
+          {contactsEnabled && showImport ? (
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Excel import</div>
+              <h3>Bestaande data importeren</h3>
+              <p className="status">
+                Ondersteund: CSV, TXT, XLS en XLSX. Verplichte kolom: Name of Naam.
               </p>
-              <button className="button button-danger" type="submit">Definitief verwijderen</button>
-            </form>
-          </div>
-        </div>
-      ) : null}
+              <form className="stack workspace-import" onSubmit={importRows}>
+                <input className="input" type="file" accept=".csv,.txt,.xls,.xlsx" onChange={onImportFilePicked} />
+                <textarea
+                  className="input"
+                  rows={8}
+                  value={importText}
+                  onChange={(entry) => {
+                    setImportText(entry.target.value);
+                    if (entry.target.value.trim()) {
+                      setImportRowsFromFile([]);
+                    }
+                  }}
+                  placeholder={"Name,Company,Email,ContactedAt,ContactMethod,Summary\nJan Jansen,Merlijn Meubels,jan@example.nl,2026-06-01 10:30,Telefoon,Interesse in offerte"}
+                />
+                <button className="button" type="submit">Regels importeren</button>
+                {importInfo ? <div className="status">{importInfo}</div> : null}
+              </form>
+            </article>
+          ) : null}
 
-      {error && <div className="workspace-error">{error}</div>}
-    </main>
+          {contactsEnabled && showFollowUp ? (
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Opvolging</div>
+              <h3>Welke klanten hebben opvolging nodig?</h3>
+              <form className="workspace-follow-up-filter" onSubmit={updateFollowUpWindow}>
+                <label className="status" htmlFor="follow-up-days">Opvolging na aantal dagen zonder contact</label>
+                <input
+                  id="follow-up-days"
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={followUpDays}
+                  onChange={(entry) => setFollowUpDays(Number(entry.target.value) || 14)}
+                />
+                <button className="button" type="submit">Verversen</button>
+              </form>
+
+              <div className="workspace-metrics" style={{ marginTop: 10 }}>
+                <div>
+                  <span>Totaal klanten</span>
+                  <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Opvolging nodig</span>
+                  <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Termijn</span>
+                  <strong>{contactsOverview?.followUpDays ?? followUpDays} dagen</strong>
+                </div>
+              </div>
+
+              <div className="workspace-table-wrap">
+                <table className="workspace-table">
+                  <thead>
+                    <tr>
+                      <th>Klant</th>
+                      <th>Laatste contact</th>
+                      <th>Dagen geleden</th>
+                      <th>Status</th>
+                      <th>Actie</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {followUpCustomers.length ? (
+                      followUpCustomers.map((customer) => (
+                        <tr key={customer.id}>
+                          <td>
+                            <strong>{customer.name}</strong>
+                            {customer.company ? <div className="status">{customer.company}</div> : null}
+                          </td>
+                          <td>
+                            {customer.lastContactAt
+                              ? new Date(customer.lastContactAt).toLocaleString()
+                              : "Nog geen contact geregistreerd"}
+                          </td>
+                          <td>{customer.daysSinceLastContact ?? "-"}</td>
+                          <td>
+                            <span className="tag tag-alert">Opvolging nodig</span>
+                          </td>
+                          <td>
+                            <div className="workspace-actions">
+                              <button className="button button-secondary button-small" type="button" onClick={() => openEditCustomerModal(customer)}>
+                                Bewerken
+                              </button>
+                              <button className="button button-danger button-small" type="button" onClick={() => openDeleteCustomerModal(customer)}>
+                                Verwijderen
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5}>Geen klanten met open opvolging.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ) : null}
+
+          {showAccount ? (
+            <aside className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Account</div>
+              <h3>Inloggegevens wijzigen</h3>
+              <p>Pas je e-mail of wachtwoord aan wanneer dat nodig is.</p>
+              <form className="stack" onSubmit={updateAccount}>
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="Huidig wachtwoord"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  required
+                />
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="Nieuw e-mailadres"
+                  value={newEmail}
+                  onChange={(event) => setNewEmail(event.target.value)}
+                />
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="Nieuw wachtwoord"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  minLength={8}
+                />
+                <button className="button" type="submit">
+                  Inloggegevens opslaan
+                </button>
+              </form>
+            </aside>
+          ) : null}
+        </section>
+
+        {isCreateCustomerModalOpen ? (
+          <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Nieuwe klant toevoegen">
+            <div className="workspace-modal-content">
+              <div className="workspace-modal-header">
+                <h3>Nieuwe klant toevoegen</h3>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setIsCreateCustomerModalOpen(false)}
+                >
+                  Sluiten
+                </button>
+              </div>
+
+              <form className="stack" onSubmit={createCustomer}>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Naam klant"
+                  value={newCustomerName}
+                  onChange={(entry) => setNewCustomerName(entry.target.value)}
+                  required
+                />
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Bedrijf"
+                  value={newCustomerCompany}
+                  onChange={(entry) => setNewCustomerCompany(entry.target.value)}
+                />
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="E-mail"
+                  value={newCustomerEmail}
+                  onChange={(entry) => setNewCustomerEmail(entry.target.value)}
+                />
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Telefoon"
+                  value={newCustomerPhone}
+                  onChange={(entry) => setNewCustomerPhone(entry.target.value)}
+                />
+
+                <h4>Eerste contact (optioneel)</h4>
+                <select
+                  className="input"
+                  value={newCustomerInitialMethod}
+                  onChange={(entry) => setNewCustomerInitialMethod(entry.target.value)}
+                >
+                  <option>Telefoon</option>
+                  <option>Email</option>
+                  <option>WhatsApp</option>
+                  <option>Op locatie</option>
+                  <option>Overig</option>
+                </select>
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={newCustomerInitialDateTime}
+                  onChange={(entry) => setNewCustomerInitialDateTime(entry.target.value)}
+                />
+                <textarea
+                  className="input"
+                  rows={3}
+                  placeholder="Notitie eerste contact"
+                  value={newCustomerInitialSummary}
+                  onChange={(entry) => setNewCustomerInitialSummary(entry.target.value)}
+                />
+
+                <button className="button" type="submit">Klant opslaan</button>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {isEditCustomerModalOpen ? (
+          <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Klant bewerken">
+            <div className="workspace-modal-content">
+              <div className="workspace-modal-header">
+                <h3>Klant bewerken</h3>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => setIsEditCustomerModalOpen(false)}
+                >
+                  Sluiten
+                </button>
+              </div>
+
+              <form className="stack" onSubmit={updateCustomer}>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Naam klant"
+                  value={editCustomerName}
+                  onChange={(entry) => setEditCustomerName(entry.target.value)}
+                  required
+                />
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Bedrijf"
+                  value={editCustomerCompany}
+                  onChange={(entry) => setEditCustomerCompany(entry.target.value)}
+                />
+                <input
+                  className="input"
+                  type="email"
+                  placeholder="E-mail"
+                  value={editCustomerEmail}
+                  onChange={(entry) => setEditCustomerEmail(entry.target.value)}
+                />
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="Telefoon"
+                  value={editCustomerPhone}
+                  onChange={(entry) => setEditCustomerPhone(entry.target.value)}
+                />
+                <button className="button" type="submit">Wijzigingen opslaan</button>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {isDeleteCustomerModalOpen ? (
+          <div className="workspace-modal" role="dialog" aria-modal="true" aria-label="Klant verwijderen">
+            <div className="workspace-modal-content">
+              <div className="workspace-modal-header">
+                <h3>Klant verwijderen</h3>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteCustomerModalOpen(false);
+                    setDeletingCustomer(null);
+                  }}
+                >
+                  Annuleren
+                </button>
+              </div>
+
+              <form className="stack" onSubmit={deleteCustomer}>
+                <p>
+                  Weet je zeker dat je <strong>{deletingCustomer?.name ?? "deze klant"}</strong> wilt verwijderen?
+                  Alle gekoppelde contactmomenten worden ook verwijderd.
+                </p>
+                <button className="button button-danger" type="submit">Definitief verwijderen</button>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {error && <div className="workspace-error">{error}</div>}
+      </main>
+    </>
   );
 }
