@@ -19,6 +19,7 @@ const CONTACT_SMTP_CONNECTION_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_CONNE
 const CONTACT_SMTP_GREETING_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_GREETING_TIMEOUT_MS || 10000);
 const CONTACT_SMTP_SOCKET_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_SOCKET_TIMEOUT_MS || 20000);
 const CONTACT_SEND_TIMEOUT_MS = Number(process.env.CONTACT_SEND_TIMEOUT_MS || 25000);
+const CONTACT_SEND_CUSTOMER_CONFIRMATION = String(process.env.CONTACT_SEND_CUSTOMER_CONFIRMATION || "true").toLowerCase() !== "false";
 const contactRateLimitStore = new Map<string, number[]>();
 
 function escapeHtml(value = "") {
@@ -148,21 +149,35 @@ router.post("/api/contact", async (req, res) => {
   };
 
   try {
+    // Internal notification is the critical path; if this fails, the submission is not delivered.
     await withTimeout(
-      Promise.all([
-        transporter.sendMail(customerMail),
-        transporter.sendMail(internalMail)
-      ]),
+      transporter.sendMail(internalMail),
       CONTACT_SEND_TIMEOUT_MS,
-      "Contact mail timeout"
+      "Contact internal mail timeout"
     );
+
+    if (CONTACT_SEND_CUSTOMER_CONFIRMATION) {
+      try {
+        await withTimeout(
+          transporter.sendMail(customerMail),
+          CONTACT_SEND_TIMEOUT_MS,
+          "Contact customer confirmation timeout"
+        );
+      } catch (customerMailError) {
+        console.error("Contact form confirmation email failed:", customerMailError);
+        return res.json({
+          success: true,
+          message: `Bericht ontvangen en doorgestuurd naar ${CONTACT_RECIPIENT_EMAIL}. Bevestigingsmail naar de afzender kon niet worden verzonden.`
+        });
+      }
+    }
 
     return res.json({
       success: true,
       message: `Bericht succesvol verzonden naar ${CONTACT_RECIPIENT_EMAIL}. Wij nemen spoedig contact met u op.`
     });
   } catch (error) {
-    console.error("Contact form email error:", error);
+    console.error("Contact form internal email error:", error);
     return res.status(500).json({ error: "Verzenden is nu niet gelukt. Probeert u het later opnieuw." });
   }
 });
