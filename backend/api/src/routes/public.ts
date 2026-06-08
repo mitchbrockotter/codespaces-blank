@@ -15,6 +15,10 @@ const contactSchema = z.object({
 const CONTACT_RECIPIENT_EMAIL = process.env.CONTACT_RECIPIENT_EMAIL || "pkbackendautomation@gmail.com";
 const CONTACT_RATE_LIMIT_WINDOW_MS = Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const CONTACT_RATE_LIMIT_MAX_REQUESTS = Number(process.env.CONTACT_RATE_LIMIT_MAX_REQUESTS || 5);
+const CONTACT_SMTP_CONNECTION_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_CONNECTION_TIMEOUT_MS || 10000);
+const CONTACT_SMTP_GREETING_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_GREETING_TIMEOUT_MS || 10000);
+const CONTACT_SMTP_SOCKET_TIMEOUT_MS = Number(process.env.CONTACT_SMTP_SOCKET_TIMEOUT_MS || 20000);
+const CONTACT_SEND_TIMEOUT_MS = Number(process.env.CONTACT_SEND_TIMEOUT_MS || 25000);
 const contactRateLimitStore = new Map<string, number[]>();
 
 function escapeHtml(value = "") {
@@ -41,11 +45,31 @@ function createContactTransporter() {
     host,
     port,
     secure,
+    connectionTimeout: CONTACT_SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: CONTACT_SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: CONTACT_SMTP_SOCKET_TIMEOUT_MS,
     auth: {
       user,
       pass
     }
   });
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function isContactRateLimited(ipAddress: string) {
@@ -124,10 +148,14 @@ router.post("/api/contact", async (req, res) => {
   };
 
   try {
-    await Promise.all([
-      transporter.sendMail(customerMail),
-      transporter.sendMail(internalMail)
-    ]);
+    await withTimeout(
+      Promise.all([
+        transporter.sendMail(customerMail),
+        transporter.sendMail(internalMail)
+      ]),
+      CONTACT_SEND_TIMEOUT_MS,
+      "Contact mail timeout"
+    );
 
     return res.json({
       success: true,

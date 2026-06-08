@@ -19,6 +19,7 @@ function contactApiPath(path: string) {
 }
 
 export default function ContactPage() {
+  const CONTACT_REQUEST_TIMEOUT_MS = 20000;
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [subject, setSubject] = React.useState("");
@@ -46,12 +47,18 @@ export default function ContactPage() {
 
     setLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, CONTACT_REQUEST_TIMEOUT_MS);
+
     try {
       const response = await fetch(contactApiPath("/api/contact"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
+        signal: controller.signal,
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim(),
@@ -75,8 +82,13 @@ export default function ContactPage() {
       setEmailText("");
       setWebsite("");
     } catch (err) {
-      setError((err as Error).message || "Er ging iets mis bij het verzenden.");
+      if ((err as Error).name === "AbortError") {
+        setError("Verzenden duurt te lang. Controleer de e-mailinstellingen en probeer opnieuw.");
+      } else {
+        setError((err as Error).message || "Er ging iets mis bij het verzenden.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
