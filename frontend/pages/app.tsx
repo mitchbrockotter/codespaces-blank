@@ -37,6 +37,16 @@ type ContactImportRow = {
   summary?: string;
 };
 
+type HeaderIndex = {
+  name: number;
+  company: number;
+  email: number;
+  phone: number;
+  contactedAt: number;
+  contactMethod: number;
+  summary: number;
+};
+
 function parseDelimitedLine(line: string, delimiter: string) {
   const values: string[] = [];
   let current = "";
@@ -104,6 +114,18 @@ function parseContactDate(raw: string) {
   return undefined;
 }
 
+function buildHeaderIndex(headers: string[]): HeaderIndex {
+  return {
+    name: headers.findIndex((header) => ["name", "naam", "customer", "klant"].includes(header)),
+    company: headers.findIndex((header) => ["company", "bedrijf"].includes(header)),
+    email: headers.findIndex((header) => ["email", "mail", "emailadres"].includes(header)),
+    phone: headers.findIndex((header) => ["phone", "telefoon", "gsm", "mobiel", "telefoonnummer"].includes(header)),
+    contactedAt: headers.findIndex((header) => ["contactedat", "laatstecontact", "contactdatum", "datum"].includes(header)),
+    contactMethod: headers.findIndex((header) => ["contactmethod", "methode", "kanaal", "method"].includes(header)),
+    summary: headers.findIndex((header) => ["summary", "notitie", "notes", "omschrijving"].includes(header))
+  };
+}
+
 function parseImportRows(text: string): ContactImportRow[] {
   const lines = text
     .split(/\r?\n/)
@@ -126,16 +148,7 @@ function parseImportRows(text: string): ContactImportRow[] {
   }, { token: ",", score: -1 }).token;
 
   const headers = parseDelimitedLine(lines[0], delimiter).map(normalizeHeader);
-
-  const headerIndex = {
-    name: headers.findIndex((header) => ["name", "naam", "customer", "klant"].includes(header)),
-    company: headers.findIndex((header) => ["company", "bedrijf"].includes(header)),
-    email: headers.findIndex((header) => ["email", "mail"].includes(header)),
-    phone: headers.findIndex((header) => ["phone", "telefoon", "gsm", "mobiel"].includes(header)),
-    contactedAt: headers.findIndex((header) => ["contactedat", "laatstecontact", "contactdatum", "datum"].includes(header)),
-    contactMethod: headers.findIndex((header) => ["contactmethod", "methode", "kanaal", "method"].includes(header)),
-    summary: headers.findIndex((header) => ["summary", "notitie", "notes", "omschrijving"].includes(header))
-  };
+  const headerIndex = buildHeaderIndex(headers);
 
   if (headerIndex.name < 0) {
     return [];
@@ -176,39 +189,57 @@ function normalizeObjectValue(value: unknown): string {
   return String(value).trim();
 }
 
-function parseRowsFromObjects(rows: Record<string, unknown>[]): ContactImportRow[] {
-  if (!rows.length) {
+function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
+  if (!matrix.length) {
+    return [];
+  }
+
+  const normalizedRows = matrix
+    .map((row) => (Array.isArray(row) ? row.map((value) => normalizeObjectValue(value)) : []))
+    .filter((row) => row.some((cell) => cell.trim().length > 0));
+
+  if (!normalizedRows.length) {
+    return [];
+  }
+
+  const maxHeaderScan = Math.min(25, normalizedRows.length);
+  let headerRowIndex = -1;
+  let headerIndex: HeaderIndex | null = null;
+
+  for (let i = 0; i < maxHeaderScan; i += 1) {
+    const headers = normalizedRows[i].map(normalizeHeader);
+    const currentIndex = buildHeaderIndex(headers);
+    if (currentIndex.name >= 0) {
+      headerRowIndex = i;
+      headerIndex = currentIndex;
+      break;
+    }
+  }
+
+  if (!headerIndex || headerRowIndex < 0) {
     return [];
   }
 
   const parsed: ContactImportRow[] = [];
 
-  for (const rawRow of rows) {
-    const normalizedRow: Record<string, string> = {};
-    Object.entries(rawRow).forEach(([key, value]) => {
-      normalizedRow[normalizeHeader(key)] = normalizeObjectValue(value);
-    });
+  for (let i = headerRowIndex + 1; i < normalizedRows.length; i += 1) {
+    const row = normalizedRows[i];
 
-    const name = normalizedRow.name || normalizedRow.naam || normalizedRow.customer || normalizedRow.klant;
+    const name = row[headerIndex.name]?.trim();
     if (!name) {
       continue;
     }
 
-    const contactedAtRaw =
-      normalizedRow.contactedat ||
-      normalizedRow.laatstecontact ||
-      normalizedRow.contactdatum ||
-      normalizedRow.datum ||
-      "";
+    const contactedAtRaw = headerIndex.contactedAt >= 0 ? row[headerIndex.contactedAt]?.trim() || "" : "";
 
     parsed.push({
       name,
-      company: normalizedRow.company || normalizedRow.bedrijf || undefined,
-      email: normalizedRow.email || normalizedRow.mail || undefined,
-      phone: normalizedRow.phone || normalizedRow.telefoon || normalizedRow.gsm || normalizedRow.mobiel || undefined,
+      company: headerIndex.company >= 0 ? row[headerIndex.company]?.trim() || undefined : undefined,
+      email: headerIndex.email >= 0 ? row[headerIndex.email]?.trim() || undefined : undefined,
+      phone: headerIndex.phone >= 0 ? row[headerIndex.phone]?.trim() || undefined : undefined,
       contactedAt: contactedAtRaw ? parseContactDate(contactedAtRaw) : undefined,
-      contactMethod: normalizedRow.contactmethod || normalizedRow.methode || normalizedRow.kanaal || normalizedRow.method || undefined,
-      summary: normalizedRow.summary || normalizedRow.notitie || normalizedRow.notes || normalizedRow.omschrijving || undefined
+      contactMethod: headerIndex.contactMethod >= 0 ? row[headerIndex.contactMethod]?.trim() || undefined : undefined,
+      summary: headerIndex.summary >= 0 ? row[headerIndex.summary]?.trim() || undefined : undefined
     });
   }
 
@@ -495,10 +526,13 @@ export default function AppPage() {
           return;
         }
 
-        const rawRows = xlsx.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
-          defval: ""
-        }) as Record<string, unknown>[];
-        const parsedRows = parseRowsFromObjects(rawRows);
+        const sheetRows = xlsx.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
+          header: 1,
+          defval: "",
+          raw: false,
+          blankrows: false
+        }) as unknown[][];
+        const parsedRows = parseRowsFromMatrix(sheetRows);
 
         if (!parsedRows.length) {
           setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
