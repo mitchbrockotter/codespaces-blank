@@ -646,9 +646,21 @@ export default function AppPage() {
     }
   };
 
-  const environmentLabel = "Merlijn Meubels omgeving";
+  const environmentLabel = "Merlijn Meubel en Interieurbouw omgeving";
   const allCustomers = contactsOverview?.customers ?? [];
   const followUpCustomers = allCustomers.filter((customer) => customer.needsFollowUp);
+  const prioritizedFollowUpCustomers = [...followUpCustomers]
+    .sort((a, b) => {
+      const aScore = a.daysSinceLastContact === null ? Number.MAX_SAFE_INTEGER : a.daysSinceLastContact;
+      const bScore = b.daysSinceLastContact === null ? Number.MAX_SAFE_INTEGER : b.daysSinceLastContact;
+      return bScore - aScore;
+    })
+    .slice(0, 5);
+  const hasCustomers = allCustomers.length > 0;
+  const nextStep = !hasCustomers ? "Stap 1: voeg je eerste klant toe" : followUpCustomers.length > 0 ? "Stap 2: werk opvolging bij" : "Stap 3: importeer extra klanten uit Excel";
+  const urgentFollowUpLabel = followUpCustomers.length > 0
+    ? `${followUpCustomers.length} klant(en) vragen nu opvolging`
+    : "Geen directe opvolging nodig";
   const showOverview = activeSection === "overzicht";
   const showCustomers = activeSection === "klanten";
   const showFollowUp = activeSection === "opvolging";
@@ -682,19 +694,19 @@ export default function AppPage() {
             <div className="badge">Afgeschermde klantomgeving</div>
             <h1>{environmentLabel}</h1>
             <p className="workspace-lead">
-              Een vertrouwde werkomgeving om klantinformatie, opvolging en import centraal te beheren.
+              Simpele workflow voor Merlijn: klanten toevoegen, contact bijwerken en Excel importeren.
             </p>
             <div className="workspace-meta">
               <span>{user ? `Ingelogd als ${user.email}` : "Account laden..."}</span>
               <span>Beveiligde omgeving</span>
-              <span>Alleen voor Merlijn Meubels</span>
+              <span>Alleen voor Merlijn Meubel en Interieurbouw</span>
             </div>
           </div>
 
           <div className="workspace-hero-panel">
             <div className="workspace-panel-label">Live overzicht</div>
-            <div className="workspace-panel-value">Omgeving gereed</div>
-            <div className="workspace-panel-subtitle">Klantbeheer en import zijn beschikbaar</div>
+            <div className="workspace-panel-value">{urgentFollowUpLabel}</div>
+            <div className="workspace-panel-subtitle">Prioriteit: werk eerst klanten met open opvolging bij</div>
             <div className="workspace-panel-stats">
               <div>
                 <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
@@ -713,28 +725,82 @@ export default function AppPage() {
         </section>
 
         <section className="workspace-nav">
-          <button className={`workspace-nav-button ${showOverview ? "active" : ""}`} type="button" onClick={() => setActiveSection("overzicht")}>Overzicht</button>
-          {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klanten</button> : null}
-          {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Opvolging</button> : null}
-          {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Import</button> : null}
+          <button className={`workspace-nav-button ${showOverview ? "active" : ""}`} type="button" onClick={() => setActiveSection("overzicht")}>Start</button>
+          {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klantenlijst</button> : null}
+          {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Te bellen</button> : null}
+          {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Excel upload</button> : null}
           <button className={`workspace-nav-button ${showAccount ? "active" : ""}`} type="button" onClick={() => setActiveSection("account")}>Profiel</button>
         </section>
+
+        {contactsEnabled ? (
+          <section className="workspace-grid" style={{ marginBottom: 20 }}>
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Belangrijk nu</div>
+              <h3>{nextStep}</h3>
+              <p className="status">Werk in deze volgorde voor de makkelijkste dagelijkse flow vanuit je worksheet.</p>
+              <div className="workspace-actions" style={{ marginTop: 10 }}>
+                <button className="button" type="button" onClick={() => setActiveSection("opvolging")}>Nu opvolgen ({followUpCustomers.length})</button>
+                <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>1. Klant toevoegen</button>
+                <button className="button button-secondary" type="button" onClick={() => setActiveSection("opvolging")}>2. Opvolging bijwerken</button>
+                <button className="button button-secondary" type="button" onClick={() => setActiveSection("import")}>3. Excel importeren</button>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {contactsEnabled && showOverview ? (
+          <section className="workspace-grid" style={{ marginBottom: 20 }}>
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Vandaag</div>
+              <h3>Top 5 klanten voor opvolging</h3>
+              {prioritizedFollowUpCustomers.length ? (
+                <div className="workspace-table-wrap">
+                  <table className="workspace-table">
+                    <thead>
+                      <tr>
+                        <th>Klant</th>
+                        <th>Bedrijf</th>
+                        <th>Laatst contact</th>
+                        <th>Urgentie</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prioritizedFollowUpCustomers.map((customer) => (
+                        <tr key={customer.id}>
+                          <td><strong>{customer.name}</strong></td>
+                          <td>{customer.company || "-"}</td>
+                          <td>{customer.lastContactAt ? new Date(customer.lastContactAt).toLocaleString() : "Nog geen contact"}</td>
+                          <td>{customer.daysSinceLastContact === null ? "Hoog (nieuw)" : `${customer.daysSinceLastContact} dagen`}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="status">Geen klanten met open opvolging voor vandaag.</p>
+              )}
+              <div className="workspace-actions" style={{ marginTop: 10 }}>
+                <button className="button" type="button" onClick={() => setActiveSection("opvolging")}>Open volledige opvolglijst</button>
+              </div>
+            </article>
+          </section>
+        ) : null}
 
         <section className="workspace-grid">
           {showOverview ? (
             <article className="workspace-card workspace-card-primary">
               <div className="card eyebrow">Hoofdactie</div>
-              <h2>Start met klantbeheer</h2>
+              <h2>Dagstart voor Merlijn</h2>
               <p>
-                Voeg direct een klant toe, registreer contactmomenten en houd opvolging centraal bij in deze omgeving.
+                Open direct de klantenlijst, voeg nieuwe klanten toe en werk daarna je opvolging bij.
               </p>
               <div className="stack">
                 <button className="button button-strong" type="button" onClick={() => setActiveSection("klanten")}>Ga naar klanten</button>
                 <button className="button button-secondary" type="button" onClick={() => setActiveSection("import")}>Open import</button>
               </div>
               <div className="workspace-inline-status">
-                <span>Status</span>
-                <strong>Klaar voor gebruik</strong>
+                <span>Vandaag</span>
+                <strong>{nextStep}</strong>
               </div>
             </article>
           ) : null}
@@ -767,7 +833,7 @@ export default function AppPage() {
                 <div className="card eyebrow">Klantbeheer</div>
                 <h3>Klanten en contactmomenten</h3>
                 <p className="status">
-                  Voeg klanten toe, registreer contactmomenten en beheer alle gegevens in één overzicht.
+                  Alles op één plek: toevoegen, laatste contact noteren en meteen het overzicht bijwerken.
                 </p>
 
                 <div className="workspace-split">
@@ -871,7 +937,7 @@ export default function AppPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5}>Nog geen klanten toegevoegd.</td>
+                          <td colSpan={5}>Nog geen klanten toegevoegd. Start met de knop Klant toevoegen hierboven.</td>
                         </tr>
                       )}
                     </tbody>
