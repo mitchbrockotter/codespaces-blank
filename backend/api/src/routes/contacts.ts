@@ -26,10 +26,28 @@ const createEventSchema = z.object({
   summary: z.string().max(1000).optional()
 });
 
+const customerProcessStatusSchema = z.object({
+  status: z.enum(["ACTIEF", "AFGEROND", "AFGESCHAALD"])
+});
+
+function normalizeImportEmail(raw?: string) {
+  const value = raw?.trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+
+  const basicEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!basicEmailPattern.test(value)) {
+    return null;
+  }
+
+  return value;
+}
+
 const importRowSchema = z.object({
   name: z.string().min(2).max(120),
   company: z.string().max(160).optional(),
-  email: z.string().email().max(160).optional(),
+  email: z.string().max(160).optional(),
   phone: z.string().max(60).optional(),
   contactedAt: z.string().datetime().optional(),
   contactMethod: z.string().min(2).max(40).optional(),
@@ -93,7 +111,7 @@ router.post("/customers", async (req, res, next) => {
     const payload = createCustomerSchema.parse(req.body);
 
     const result = await pool.query(
-      "INSERT INTO customers (tenant_id, name, company, email, phone, updated_at) VALUES ($1, $2, $3, $4, $5, now()) RETURNING id, name, company, email, phone, created_at",
+      "INSERT INTO customers (tenant_id, name, company, email, phone, process_status, status_assigned_at, updated_at) VALUES ($1, $2, $3, $4, $5, 'ACTIEF', NULL, now()) RETURNING id, name, company, email, phone, process_status, status_assigned_at, created_at",
       [tenantId, payload.name, payload.company ?? null, payload.email ?? null, payload.phone ?? null]
     );
 
@@ -112,19 +130,26 @@ router.get("/customers", async (req, res, next) => {
 
     const followUpDaysRaw = Number(req.query.followUpDays ?? 14);
     const followUpDays = Number.isFinite(followUpDaysRaw) ? Math.max(1, Math.min(120, followUpDaysRaw)) : 14;
+    const statusRaw = String(req.query.status ?? "ALL").toUpperCase();
+    const statusFilter = ["ALL", "ACTIEF", "AFGEROND", "AFGESCHAALD"].includes(statusRaw) ? statusRaw : "ALL";
 
-    const result = await pool.query(
-      "SELECT c.id, c.name, c.company, c.email, c.phone, c.created_at, e.contacted_at AS last_contact_at, e.contact_method AS last_contact_method, e.summary AS last_contact_summary, COALESCE(FLOOR(EXTRACT(EPOCH FROM (now() - e.contacted_at)) / 86400)::int, NULL) AS days_since_last_contact FROM customers c LEFT JOIN LATERAL ( SELECT contacted_at, contact_method, summary FROM customer_contact_events WHERE tenant_id = $1 AND customer_id = c.id ORDER BY contacted_at DESC LIMIT 1 ) e ON true WHERE c.tenant_id = $1 ORDER BY COALESCE(e.contacted_at, c.created_at) DESC, c.name ASC",
-      [tenantId]
-    );
+    const query = statusFilter === "ALL"
+      ? "SELECT c.id, c.name, c.company, c.email, c.phone, c.process_status, c.status_assigned_at, c.created_at, e.contacted_at AS last_contact_at, e.contact_method AS last_contact_method, e.summary AS last_contact_summary, COALESCE(FLOOR(EXTRACT(EPOCH FROM (now() - e.contacted_at)) / 86400)::int, NULL) AS days_since_last_contact FROM customers c LEFT JOIN LATERAL ( SELECT contacted_at, contact_method, summary FROM customer_contact_events WHERE tenant_id = $1 AND customer_id = c.id ORDER BY contacted_at DESC LIMIT 1 ) e ON true WHERE c.tenant_id = $1 ORDER BY COALESCE(c.status_assigned_at, e.contacted_at, c.created_at) DESC, c.name ASC"
+      : "SELECT c.id, c.name, c.company, c.email, c.phone, c.process_status, c.status_assigned_at, c.created_at, e.contacted_at AS last_contact_at, e.contact_method AS last_contact_method, e.summary AS last_contact_summary, COALESCE(FLOOR(EXTRACT(EPOCH FROM (now() - e.contacted_at)) / 86400)::int, NULL) AS days_since_last_contact FROM customers c LEFT JOIN LATERAL ( SELECT contacted_at, contact_method, summary FROM customer_contact_events WHERE tenant_id = $1 AND customer_id = c.id ORDER BY contacted_at DESC LIMIT 1 ) e ON true WHERE c.tenant_id = $1 AND c.process_status = $2 ORDER BY COALESCE(c.status_assigned_at, e.contacted_at, c.created_at) DESC, c.name ASC";
+
+    const result = statusFilter === "ALL"
+      ? await pool.query(query, [tenantId])
+      : await pool.query(query, [tenantId, statusFilter]);
 
     const customers = result.rows.map((row) => {
       const daysSinceLastContact =
         row.days_since_last_contact === null || row.days_since_last_contact === undefined
           ? null
           : Number(row.days_since_last_contact);
-      const needsFollowUp =
-        daysSinceLastContact === null ? true : daysSinceLastContact >= followUpDays;
+      const processStatus = row.process_status || "ACTIEF";
+      const needsFollowUp = processStatus === "ACTIEF"
+        ? (daysSinceLastContact === null ? true : daysSinceLastContact >= followUpDays)
+        : false;
 
       return {
         id: Number(row.id),
@@ -132,6 +157,8 @@ router.get("/customers", async (req, res, next) => {
         company: row.company,
         email: row.email,
         phone: row.phone,
+        processStatus,
+        statusAssignedAt: row.status_assigned_at,
         createdAt: row.created_at,
         lastContactAt: row.last_contact_at,
         lastContactMethod: row.last_contact_method,
@@ -185,6 +212,32 @@ router.patch("/customers/:customerId", async (req, res, next) => {
         customerId,
         tenantId
       ]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    return res.json({ customer: result.rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/customers/:customerId/status", async (req, res, next) => {
+  try {
+    const tenantId = req.auth?.tenantId;
+    if (!tenantId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const customerId = z.coerce.number().int().positive().parse(req.params.customerId);
+    const { status } = customerProcessStatusSchema.parse(req.body);
+    const statusAssignedAt = status === "ACTIEF" ? null : new Date();
+
+    const result = await pool.query(
+      "UPDATE customers SET process_status = $1, status_assigned_at = $2, updated_at = now() WHERE id = $3 AND tenant_id = $4 RETURNING id, name, process_status, status_assigned_at",
+      [status, statusAssignedAt, customerId, tenantId]
     );
 
     if (result.rowCount === 0) {
@@ -277,7 +330,7 @@ router.post("/import", async (req, res, next) => {
     for (const row of rows) {
       const normalizedName = row.name.trim();
       const normalizedCompany = row.company?.trim() || null;
-      const normalizedEmail = row.email?.trim().toLowerCase() || null;
+      const normalizedEmail = normalizeImportEmail(row.email);
       const normalizedPhone = row.phone?.trim() || null;
 
       const existingCustomerResult = normalizedEmail
@@ -301,7 +354,7 @@ router.post("/import", async (req, res, next) => {
         updatedCustomers += 1;
       } else {
         const insertCustomerResult = await client.query(
-          "INSERT INTO customers (tenant_id, name, company, email, phone, updated_at) VALUES ($1, $2, $3, $4, $5, now()) RETURNING id",
+          "INSERT INTO customers (tenant_id, name, company, email, phone, process_status, status_assigned_at, updated_at) VALUES ($1, $2, $3, $4, $5, 'ACTIEF', NULL, now()) RETURNING id",
           [tenantId, normalizedName, normalizedCompany, normalizedEmail, normalizedPhone]
         );
         customerId = Number(insertCustomerResult.rows[0].id);

@@ -8,6 +8,8 @@ type ContactCustomer = {
   company: string | null;
   email: string | null;
   phone: string | null;
+  processStatus: "ACTIEF" | "AFGEROND" | "AFGESCHAALD";
+  statusAssignedAt: string | null;
   createdAt: string;
   lastContactAt: string | null;
   lastContactMethod: string | null;
@@ -301,7 +303,8 @@ export default function AppPage() {
   const [editCustomerEmail, setEditCustomerEmail] = React.useState("");
   const [editCustomerPhone, setEditCustomerPhone] = React.useState("");
   const [contactsEnabled, setContactsEnabled] = React.useState(false);
-  const [activeSection, setActiveSection] = React.useState<"overzicht" | "klanten" | "opvolging" | "import" | "account">("overzicht");
+  const [activeSection, setActiveSection] = React.useState<"overzicht" | "klanten" | "opvolging" | "import" | "statusen" | "account">("overzicht");
+  const [statusListFilter, setStatusListFilter] = React.useState<"ALL" | "AFGEROND" | "AFGESCHAALD">("ALL");
   const [eventCustomerId, setEventCustomerId] = React.useState("");
   const [eventMethod, setEventMethod] = React.useState("Telefoon");
   const [eventSummary, setEventSummary] = React.useState("");
@@ -317,8 +320,9 @@ export default function AppPage() {
   const loadContactsOverview = React.useCallback(async (days = followUpDays) => {
     const data = await apiRequest<ContactsOverviewResponse>(`/contacts/customers?followUpDays=${days}`);
     setContactsOverview(data);
-    if (!eventCustomerId && data.customers.length > 0) {
-      setEventCustomerId(String(data.customers[0].id));
+    const activeCustomer = data.customers.find((customer) => customer.processStatus === "ACTIEF");
+    if (!eventCustomerId && activeCustomer) {
+      setEventCustomerId(String(activeCustomer.id));
     }
   }, [eventCustomerId, followUpDays]);
 
@@ -532,6 +536,19 @@ export default function AppPage() {
     }
   };
 
+  const updateCustomerStatus = async (customerId: number, status: "ACTIEF" | "AFGEROND" | "AFGESCHAALD") => {
+    setError(null);
+    try {
+      await apiRequest<{ customer: { id: number } }>(`/contacts/customers/${customerId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+      await loadContactsOverview();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
   const onImportFilePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -648,7 +665,16 @@ export default function AppPage() {
 
   const environmentLabel = "Merlijn Meubel en Interieurbouw omgeving";
   const allCustomers = contactsOverview?.customers ?? [];
-  const followUpCustomers = allCustomers.filter((customer) => customer.needsFollowUp);
+  const activeCustomers = allCustomers.filter((customer) => customer.processStatus === "ACTIEF");
+  const afgerondCustomers = allCustomers.filter((customer) => customer.processStatus === "AFGEROND");
+  const afgeschaaldCustomers = allCustomers.filter((customer) => customer.processStatus === "AFGESCHAALD");
+  const followUpCustomers = activeCustomers.filter((customer) => customer.needsFollowUp);
+  const statusListCustomers = allCustomers.filter((customer) => {
+    if (statusListFilter === "ALL") {
+      return customer.processStatus === "AFGEROND" || customer.processStatus === "AFGESCHAALD";
+    }
+    return customer.processStatus === statusListFilter;
+  });
   const prioritizedFollowUpCustomers = [...followUpCustomers]
     .sort((a, b) => {
       const aScore = a.daysSinceLastContact === null ? Number.MAX_SAFE_INTEGER : a.daysSinceLastContact;
@@ -656,7 +682,7 @@ export default function AppPage() {
       return bScore - aScore;
     })
     .slice(0, 5);
-  const hasCustomers = allCustomers.length > 0;
+  const hasCustomers = activeCustomers.length > 0;
   const nextStep = !hasCustomers ? "Stap 1: voeg je eerste klant toe" : followUpCustomers.length > 0 ? "Stap 2: werk opvolging bij" : "Stap 3: importeer extra klanten uit Excel";
   const urgentFollowUpLabel = followUpCustomers.length > 0
     ? `${followUpCustomers.length} klant(en) vragen nu opvolging`
@@ -665,6 +691,7 @@ export default function AppPage() {
   const showCustomers = activeSection === "klanten";
   const showFollowUp = activeSection === "opvolging";
   const showImport = activeSection === "import";
+  const showStatuses = activeSection === "statusen";
   const showAccount = activeSection === "account";
 
   return (
@@ -709,16 +736,16 @@ export default function AppPage() {
             <div className="workspace-panel-subtitle">Prioriteit: werk eerst klanten met open opvolging bij</div>
             <div className="workspace-panel-stats">
               <div>
-                <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
-                <span>Klanten</span>
+                <strong>{activeCustomers.length}</strong>
+                <span>Actieve klanten</span>
               </div>
               <div>
                 <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
                 <span>Opvolging nodig</span>
               </div>
               <div>
-                <strong>{contactsOverview?.followUpDays ?? followUpDays}</strong>
-                <span>Dagen termijn</span>
+                <strong>{afgerondCustomers.length + afgeschaaldCustomers.length}</strong>
+                <span>Eindstatus</span>
               </div>
             </div>
           </div>
@@ -729,6 +756,7 @@ export default function AppPage() {
           {contactsEnabled ? <button className={`workspace-nav-button ${showCustomers ? "active" : ""}`} type="button" onClick={() => setActiveSection("klanten")}>Klantenlijst</button> : null}
           {contactsEnabled ? <button className={`workspace-nav-button ${showFollowUp ? "active" : ""}`} type="button" onClick={() => setActiveSection("opvolging")}>Te bellen</button> : null}
           {contactsEnabled ? <button className={`workspace-nav-button ${showImport ? "active" : ""}`} type="button" onClick={() => setActiveSection("import")}>Excel upload</button> : null}
+          {contactsEnabled ? <button className={`workspace-nav-button ${showStatuses ? "active" : ""}`} type="button" onClick={() => setActiveSection("statusen")}>Statuslijst</button> : null}
           <button className={`workspace-nav-button ${showAccount ? "active" : ""}`} type="button" onClick={() => setActiveSection("account")}>Profiel</button>
         </section>
 
@@ -743,6 +771,7 @@ export default function AppPage() {
                 <button className="button" type="button" onClick={() => setIsCreateCustomerModalOpen(true)}>1. Klant toevoegen</button>
                 <button className="button button-secondary" type="button" onClick={() => setActiveSection("opvolging")}>2. Opvolging bijwerken</button>
                 <button className="button button-secondary" type="button" onClick={() => setActiveSection("import")}>3. Excel importeren</button>
+                <button className="button button-secondary" type="button" onClick={() => setActiveSection("statusen")}>4. Eindstatus beheren</button>
               </div>
             </article>
           </section>
@@ -807,23 +836,23 @@ export default function AppPage() {
 
           {showOverview ? (
             <article className="workspace-card workspace-card-side">
-              <div className="card eyebrow">Resultaat</div>
-              <h3>Stand van zaken</h3>
+              <div className="card eyebrow">Procesoverzicht</div>
+              <h3>Waar staan klanten nu?</h3>
               <div className="workspace-metrics">
                 <div>
-                  <span>Totaal klanten</span>
-                  <strong>{contactsOverview?.totalCustomers ?? 0}</strong>
+                  <span>Actief</span>
+                  <strong>{activeCustomers.length}</strong>
                 </div>
                 <div>
-                  <span>Opvolging nodig</span>
-                  <strong>{contactsOverview?.followUpNeeded ?? 0}</strong>
+                  <span>Afgerond</span>
+                  <strong>{afgerondCustomers.length}</strong>
                 </div>
                 <div>
-                  <span>Termijn</span>
-                  <strong>{contactsOverview?.followUpDays ?? followUpDays} dgn</strong>
+                  <span>Afgeschaald</span>
+                  <strong>{afgeschaaldCustomers.length}</strong>
                 </div>
               </div>
-              <p className="status">Rapportgeneratie is verwijderd voor deze omgeving.</p>
+              <p className="status">Klanten met eindstatus hebben geen opvolging meer nodig.</p>
             </article>
           ) : null}
 
@@ -853,8 +882,8 @@ export default function AppPage() {
                       onChange={(entry) => setEventCustomerId(entry.target.value)}
                       required
                     >
-                      {allCustomers.length ? (
-                        allCustomers.map((customer) => (
+                      {activeCustomers.length ? (
+                        activeCustomers.map((customer) => (
                           <option key={customer.id} value={customer.id}>{customer.name}</option>
                         ))
                       ) : (
@@ -896,13 +925,14 @@ export default function AppPage() {
                         <th>Klant</th>
                         <th>Contact</th>
                         <th>Laatste contact</th>
-                        <th>Status</th>
+                        <th>Opvolging</th>
+                        <th>Processtatus</th>
                         <th>Actie</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {allCustomers.length ? (
-                        allCustomers.map((customer) => (
+                      {activeCustomers.length ? (
+                        activeCustomers.map((customer) => (
                           <tr key={customer.id}>
                             <td>
                               <strong>{customer.name}</strong>
@@ -924,9 +954,18 @@ export default function AppPage() {
                               </span>
                             </td>
                             <td>
+                              <span className="tag">Actief</span>
+                            </td>
+                            <td>
                               <div className="workspace-actions">
                                 <button className="button button-secondary button-small" type="button" onClick={() => openEditCustomerModal(customer)}>
                                   Bewerken
+                                </button>
+                                <button className="button button-secondary button-small" type="button" onClick={() => updateCustomerStatus(customer.id, "AFGEROND")}>
+                                  Afgerond
+                                </button>
+                                <button className="button button-secondary button-small" type="button" onClick={() => updateCustomerStatus(customer.id, "AFGESCHAALD")}>
+                                  Afgeschaald
                                 </button>
                                 <button className="button button-danger button-small" type="button" onClick={() => openDeleteCustomerModal(customer)}>
                                   Verwijderen
@@ -937,7 +976,7 @@ export default function AppPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5}>Nog geen klanten toegevoegd. Start met de knop Klant toevoegen hierboven.</td>
+                          <td colSpan={6}>Geen actieve klanten. Controleer de statuslijst of voeg een nieuwe klant toe.</td>
                         </tr>
                       )}
                     </tbody>
@@ -958,7 +997,7 @@ export default function AppPage() {
               <div className="card eyebrow">Excel import</div>
               <h3>Bestaande data importeren</h3>
               <p className="status">
-                Ondersteund: CSV, TXT, XLS en XLSX. Verplichte kolom: Name of Naam.
+                Optioneel: upload een Excel/CSV-bestand. Ondersteund: CSV, TXT, XLS en XLSX. Verplichte kolom: Name of Naam.
               </p>
               <form className="stack workspace-import" onSubmit={importRows}>
                 <input className="input" type="file" accept=".csv,.txt,.xls,.xlsx" onChange={onImportFilePicked} />
@@ -975,6 +1014,7 @@ export default function AppPage() {
                   placeholder={"Name,Company,Email,ContactedAt,ContactMethod,Summary\nJan Jansen,Merlijn Meubels,jan@example.nl,2026-06-01 10:30,Telefoon,Interesse in offerte"}
                 />
                 <button className="button" type="submit">Regels importeren</button>
+                <div className="status">Je kunt ook zonder upload handmatig regels in het veld plakken en importeren.</div>
                 {importInfo ? <div className="status">{importInfo}</div> : null}
               </form>
             </article>
@@ -1046,6 +1086,12 @@ export default function AppPage() {
                               <button className="button button-secondary button-small" type="button" onClick={() => openEditCustomerModal(customer)}>
                                 Bewerken
                               </button>
+                              <button className="button button-secondary button-small" type="button" onClick={() => updateCustomerStatus(customer.id, "AFGEROND")}>
+                                Afgerond
+                              </button>
+                              <button className="button button-secondary button-small" type="button" onClick={() => updateCustomerStatus(customer.id, "AFGESCHAALD")}>
+                                Afgeschaald
+                              </button>
                               <button className="button button-danger button-small" type="button" onClick={() => openDeleteCustomerModal(customer)}>
                                 Verwijderen
                               </button>
@@ -1056,6 +1102,69 @@ export default function AppPage() {
                     ) : (
                       <tr>
                         <td colSpan={5}>Geen klanten met open opvolging.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ) : null}
+
+          {contactsEnabled && showStatuses ? (
+            <article className="workspace-card workspace-card-wide">
+              <div className="card eyebrow">Eindstatus lijst</div>
+              <h3>Afgerond en afgeschaald</h3>
+              <p className="status">Klanten met deze statussen vragen geen opvolging meer.</p>
+
+              <form className="workspace-follow-up-filter" onSubmit={(event) => event.preventDefault()}>
+                <label className="status" htmlFor="status-list-filter">Filter status</label>
+                <select
+                  id="status-list-filter"
+                  className="input"
+                  value={statusListFilter}
+                  onChange={(event) => setStatusListFilter(event.target.value as "ALL" | "AFGEROND" | "AFGESCHAALD")}
+                >
+                  <option value="ALL">Alles</option>
+                  <option value="AFGEROND">Afgerond</option>
+                  <option value="AFGESCHAALD">Afgeschaald</option>
+                </select>
+                <button className="button" type="button" onClick={() => loadContactsOverview()}>Verversen</button>
+              </form>
+
+              <div className="workspace-table-wrap">
+                <table className="workspace-table">
+                  <thead>
+                    <tr>
+                      <th>Klant</th>
+                      <th>Status</th>
+                      <th>Status toegekend op</th>
+                      <th>Laatste contact</th>
+                      <th>Actie</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statusListCustomers.length ? (
+                      statusListCustomers.map((customer) => (
+                        <tr key={customer.id}>
+                          <td>
+                            <strong>{customer.name}</strong>
+                            {customer.company ? <div className="status">{customer.company}</div> : null}
+                          </td>
+                          <td>
+                            <span className="tag">{customer.processStatus === "AFGEROND" ? "Afgerond" : "Afgeschaald"}</span>
+                          </td>
+                          <td>{customer.statusAssignedAt ? new Date(customer.statusAssignedAt).toLocaleString() : "-"}</td>
+                          <td>{customer.lastContactAt ? new Date(customer.lastContactAt).toLocaleString() : "Nog geen contact"}</td>
+                          <td>
+                            <button className="button button-secondary button-small" type="button" onClick={() => updateCustomerStatus(customer.id, "ACTIEF")}>
+                              Terug naar actief
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5}>Geen klanten gevonden voor dit statusfilter.</td>
                       </tr>
                     )}
                   </tbody>
