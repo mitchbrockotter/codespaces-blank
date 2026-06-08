@@ -16,6 +16,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    cache: "no-store",
     credentials: "include"
   });
 

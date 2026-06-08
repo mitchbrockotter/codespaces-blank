@@ -13,6 +13,7 @@ const app = express();
 
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
+app.set("etag", false);
 
 app.use((req, res, next) => {
   const requestId = crypto.randomBytes(12).toString("hex");
@@ -37,6 +38,8 @@ app.use((req, res, next) => {
   if (req.secure || req.headers["x-forwarded-proto"] === "https") {
     res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
   }
+  // Authenticated API responses should never be conditionally cached by the browser.
+  res.setHeader("Cache-Control", "no-store");
   return next();
 });
 
