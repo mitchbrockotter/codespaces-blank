@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
 import reportRoutes from "./routes/reports";
 import contactsRoutes from "./routes/contacts";
+import publicRoutes from "./routes/public";
 import { enforceOrigin } from "./middleware";
 
 const app = express();
@@ -64,6 +65,8 @@ app.use(express.json({ limit: "1mb" }));
 app.use(enforceOrigin);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+app.use(publicRoutes);
 
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
