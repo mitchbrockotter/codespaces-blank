@@ -103,11 +103,82 @@ router.get("/tenants", async (_req, res, next) => {
   }
 });
 
+router.get("/overview", async (_req, res, next) => {
+  try {
+    const planPriceEur = 5;
+
+    const result = await pool.query(
+      "SELECT t.id, t.name, t.created_at, " +
+        "COALESCE(ts.data_used_bytes, 0)::bigint AS data_used_bytes, " +
+        "COALESCE(ts.login_count, 0)::int AS login_count, " +
+        "ts.last_login_at, " +
+        "COALESCE(run_stats.total_runs, 0)::int AS total_runs " +
+        "FROM tenants t " +
+        "LEFT JOIN tenant_settings ts ON ts.tenant_id = t.id " +
+        "LEFT JOIN ( " +
+        "  SELECT tenant_id, COUNT(*)::int AS total_runs " +
+        "  FROM jobs " +
+        "  WHERE status = 'done' " +
+        "  GROUP BY tenant_id " +
+        ") run_stats ON run_stats.tenant_id = t.id " +
+        "ORDER BY t.created_at DESC"
+    );
+
+    const tenants = result.rows.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      createdAt: row.created_at,
+      totalRuns: Number(row.total_runs ?? 0),
+      loginCount: Number(row.login_count ?? 0),
+      dataUsedBytes: Number(row.data_used_bytes ?? 0),
+      dataUsedLabel: formatBytes(Number(row.data_used_bytes ?? 0)),
+      lastLoginAt: row.last_login_at ?? null
+    }));
+
+    const totalDataUsedBytes = tenants.reduce((sum, tenant) => sum + tenant.dataUsedBytes, 0);
+
+    const tenantsWithCost = tenants.map((tenant) => {
+      const dataShare = totalDataUsedBytes > 0 ? tenant.dataUsedBytes / totalDataUsedBytes : 0;
+      const estimatedPlanCostEur = Number((planPriceEur * dataShare).toFixed(2));
+      return {
+        ...tenant,
+        estimatedPlanCostEur
+      };
+    });
+
+    return res.json({
+      planPriceEur,
+      totalEnvironments: tenantsWithCost.length,
+      totalDataUsedBytes,
+      totalDataUsedLabel: formatBytes(totalDataUsedBytes),
+      totalEstimatedCostEur: planPriceEur,
+      tenants: tenantsWithCost
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 const userSchema = z.object({
   tenantId: z.coerce.number().int(),
   email: z.string().email(),
   password: z.string().min(8),
   role: z.enum(["ADMIN", "USER"]).optional()
+});
+
+const updateUserSchema = z.object({
+  email: z.string().email().optional(),
+  role: z.enum(["ADMIN", "USER"]).optional()
+}).refine((value) => Boolean(value.email || value.role), {
+  message: "Provide email and/or role"
+});
+
+const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8)
+});
+
+const userStatusSchema = z.object({
+  isActive: z.boolean()
 });
 
 router.post("/users", async (req, res, next) => {
@@ -120,6 +191,136 @@ router.post("/users", async (req, res, next) => {
     );
     auditLog("user_created", { userId: result.rows[0].id, tenantId, actorId: req.auth?.id });
     return res.json({ user: result.rows[0] });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/tenants/:tenantId/users", async (req, res, next) => {
+  try {
+    const tenantId = Number(req.params.tenantId);
+    const includeInactive = String(req.query.includeInactive ?? "false").toLowerCase() === "true";
+
+    const result = includeInactive
+      ? await pool.query(
+          "SELECT id, tenant_id, email, role, COALESCE(is_active, true) AS is_active, created_at FROM users WHERE tenant_id = $1 ORDER BY created_at DESC",
+          [tenantId]
+        )
+      : await pool.query(
+          "SELECT id, tenant_id, email, role, COALESCE(is_active, true) AS is_active, created_at FROM users WHERE tenant_id = $1 AND COALESCE(is_active, true) = true ORDER BY created_at DESC",
+          [tenantId]
+        );
+
+    const users = result.rows.map((row) => ({
+      id: Number(row.id),
+      tenantId: Number(row.tenant_id),
+      email: row.email,
+      role: row.role,
+      isActive: Boolean(row.is_active),
+      createdAt: row.created_at
+    }));
+
+    return res.json({ users });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/users/:userId", async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId);
+    const payload = updateUserSchema.parse(req.body);
+
+    const existingResult = await pool.query(
+      "SELECT id, email, role, COALESCE(is_active, true) AS is_active FROM users WHERE id = $1",
+      [userId]
+    );
+    const existingUser = existingResult.rows[0];
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const nextEmail = payload.email?.trim().toLowerCase() ?? existingUser.email;
+    const nextRole = payload.role ?? existingUser.role;
+
+    if (req.auth?.id === userId && nextRole !== "ADMIN") {
+      return res.status(400).json({ error: "Cannot remove your own admin role" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET email = $1, role = $2 WHERE id = $3 RETURNING id, tenant_id, email, role, COALESCE(is_active, true) AS is_active, created_at",
+      [nextEmail, nextRole, userId]
+    );
+
+    auditLog("user_updated", { userId, actorId: req.auth?.id, nextRole, nextEmail });
+
+    return res.json({
+      user: {
+        id: Number(result.rows[0].id),
+        tenantId: Number(result.rows[0].tenant_id),
+        email: result.rows[0].email,
+        role: result.rows[0].role,
+        isActive: Boolean(result.rows[0].is_active),
+        createdAt: result.rows[0].created_at
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/users/:userId/reset-password", async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId);
+    const { newPassword } = resetPasswordSchema.parse(req.body);
+
+    const userResult = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (userResult.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      "UPDATE users SET password_hash = $1 WHERE id = $2",
+      [passwordHash, userId]
+    );
+
+    auditLog("user_password_reset", { userId, actorId: req.auth?.id });
+    return res.json({ ok: true });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/users/:userId/status", async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId);
+    const { isActive } = userStatusSchema.parse(req.body);
+
+    if (req.auth?.id === userId && !isActive) {
+      return res.status(400).json({ error: "Cannot deactivate your own account" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, tenant_id, email, role, COALESCE(is_active, true) AS is_active, created_at",
+      [isActive, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    auditLog("user_status_updated", { userId, isActive, actorId: req.auth?.id });
+    return res.json({
+      user: {
+        id: Number(result.rows[0].id),
+        tenantId: Number(result.rows[0].tenant_id),
+        email: result.rows[0].email,
+        role: result.rows[0].role,
+        isActive: Boolean(result.rows[0].is_active),
+        createdAt: result.rows[0].created_at
+      }
+    });
   } catch (error) {
     return next(error);
   }

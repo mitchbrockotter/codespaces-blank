@@ -30,10 +30,13 @@ router.post("/login", async (req, res, next) => {
     const { email, password } = loginSchema.parse(req.body);
     const normalizedEmail = email.trim().toLowerCase();
     const result = await pool.query(
-      "SELECT id, tenant_id, email, password_hash, role FROM users WHERE lower(email) = $1",
+      "SELECT id, tenant_id, email, password_hash, role, COALESCE(is_active, true) AS is_active FROM users WHERE lower(email) = $1",
       [normalizedEmail]
     );
     const user = result.rows[0];
+    if (user && !user.is_active) {
+      return res.status(403).json({ error: "Account is deactivated" });
+    }
     const match = user ? await bcrypt.compare(password, user.password_hash) : false;
     if (!user || !match) {
       return res.status(401).json({ error: "Invalid credentials" });
