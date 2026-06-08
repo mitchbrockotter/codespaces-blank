@@ -71,7 +71,7 @@ export default function ContactPage() {
       const data = (await response.json().catch(() => ({}))) as ContactResponse;
 
       if (!response.ok) {
-        setError(data.error || "Er ging iets mis bij het verzenden.");
+        setError(data.error || "Er ging iets mis bij het verzenden, of mail ons direct op pkbackendautomation@gmail.com.");
         return;
       }
 
@@ -85,7 +85,7 @@ export default function ContactPage() {
       if ((err as Error).name === "AbortError") {
         setError("Verzenden duurt te lang. Controleer de e-mailinstellingen en probeer opnieuw.");
       } else {
-        setError((err as Error).message || "Er ging iets mis bij het verzenden.");
+        setError((err as Error).message || "Er ging iets mis bij het verzenden, of mail ons direct op pkbackendautomation@gmail.com.");
       }
     } finally {
       clearTimeout(timeoutId);

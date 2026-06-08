@@ -114,7 +114,7 @@ router.post("/api/contact", async (req, res) => {
   const transporter = createContactTransporter();
   const fromEmail = process.env.CONTACT_FROM_EMAIL || process.env.CONTACT_SMTP_USER;
   if (!transporter || !fromEmail) {
-    return res.status(503).json({ error: "De e-mailservice is momenteel niet beschikbaar." });
+    return res.status(503).json({ error: "De e-mailservice is momenteel niet beschikbaar, of mail ons direct op pkbackendautomation@gmail.com." });
   }
 
   const normalizedSubject = subject.replace(/[\r\n]+/g, " ").trim();
@@ -178,7 +178,7 @@ router.post("/api/contact", async (req, res) => {
     });
   } catch (error) {
     console.error("Contact form internal email error:", error);
-    return res.status(500).json({ error: "Verzenden is nu niet gelukt. Probeert u het later opnieuw." });
+    return res.status(500).json({ error: "Verzenden is nu niet gelukt. Probeert u het later opnieuw, of mail ons direct op pkbackendautomation@gmail.com." });
   }
 });
 
