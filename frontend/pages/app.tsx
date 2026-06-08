@@ -47,6 +47,11 @@ type HeaderIndex = {
   summary: number;
 };
 
+type ParsedImportResult = {
+  rows: ContactImportRow[];
+  invalidEmailCount: number;
+};
+
 function parseDelimitedLine(line: string, delimiter: string) {
   const values: string[] = [];
   let current = "";
@@ -114,6 +119,20 @@ function parseContactDate(raw: string) {
   return undefined;
 }
 
+function normalizeImportEmail(raw?: string): { value?: string; invalid: boolean } {
+  const value = raw?.trim().toLowerCase();
+  if (!value) {
+    return { value: undefined, invalid: false };
+  }
+
+  const basicEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!basicEmailPattern.test(value)) {
+    return { value: undefined, invalid: true };
+  }
+
+  return { value, invalid: false };
+}
+
 function buildHeaderIndex(headers: string[]): HeaderIndex {
   return {
     name: headers.findIndex((header) => ["name", "naam", "customer", "klant"].includes(header)),
@@ -126,14 +145,14 @@ function buildHeaderIndex(headers: string[]): HeaderIndex {
   };
 }
 
-function parseImportRows(text: string): ContactImportRow[] {
+function parseImportRows(text: string): ParsedImportResult {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
 
   if (lines.length < 2) {
-    return [];
+    return { rows: [], invalidEmailCount: 0 };
   }
 
   const sample = lines[0];
@@ -151,10 +170,11 @@ function parseImportRows(text: string): ContactImportRow[] {
   const headerIndex = buildHeaderIndex(headers);
 
   if (headerIndex.name < 0) {
-    return [];
+    return { rows: [], invalidEmailCount: 0 };
   }
 
   const rows: ContactImportRow[] = [];
+  let invalidEmailCount = 0;
 
   for (let i = 1; i < lines.length; i += 1) {
     const cells = parseDelimitedLine(lines[i], delimiter);
@@ -165,10 +185,15 @@ function parseImportRows(text: string): ContactImportRow[] {
 
     const contactedAtRaw = headerIndex.contactedAt >= 0 ? cells[headerIndex.contactedAt] : "";
 
+    const normalizedEmail = headerIndex.email >= 0 ? normalizeImportEmail(cells[headerIndex.email]) : { value: undefined, invalid: false };
+    if (normalizedEmail.invalid) {
+      invalidEmailCount += 1;
+    }
+
     rows.push({
       name,
       company: headerIndex.company >= 0 ? cells[headerIndex.company]?.trim() || undefined : undefined,
-      email: headerIndex.email >= 0 ? cells[headerIndex.email]?.trim() || undefined : undefined,
+      email: normalizedEmail.value,
       phone: headerIndex.phone >= 0 ? cells[headerIndex.phone]?.trim() || undefined : undefined,
       contactedAt: contactedAtRaw ? parseContactDate(contactedAtRaw) : undefined,
       contactMethod: headerIndex.contactMethod >= 0 ? cells[headerIndex.contactMethod]?.trim() || undefined : undefined,
@@ -176,7 +201,7 @@ function parseImportRows(text: string): ContactImportRow[] {
     });
   }
 
-  return rows;
+  return { rows, invalidEmailCount };
 }
 
 function normalizeObjectValue(value: unknown): string {
@@ -189,9 +214,9 @@ function normalizeObjectValue(value: unknown): string {
   return String(value).trim();
 }
 
-function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
+function parseRowsFromMatrix(matrix: unknown[][]): ParsedImportResult {
   if (!matrix.length) {
-    return [];
+    return { rows: [], invalidEmailCount: 0 };
   }
 
   const normalizedRows = matrix
@@ -199,7 +224,7 @@ function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
     .filter((row) => row.some((cell) => cell.trim().length > 0));
 
   if (!normalizedRows.length) {
-    return [];
+    return { rows: [], invalidEmailCount: 0 };
   }
 
   const maxHeaderScan = Math.min(25, normalizedRows.length);
@@ -217,10 +242,11 @@ function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
   }
 
   if (!headerIndex || headerRowIndex < 0) {
-    return [];
+    return { rows: [], invalidEmailCount: 0 };
   }
 
   const parsed: ContactImportRow[] = [];
+  let invalidEmailCount = 0;
 
   for (let i = headerRowIndex + 1; i < normalizedRows.length; i += 1) {
     const row = normalizedRows[i];
@@ -232,10 +258,15 @@ function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
 
     const contactedAtRaw = headerIndex.contactedAt >= 0 ? row[headerIndex.contactedAt]?.trim() || "" : "";
 
+    const normalizedEmail = headerIndex.email >= 0 ? normalizeImportEmail(row[headerIndex.email]) : { value: undefined, invalid: false };
+    if (normalizedEmail.invalid) {
+      invalidEmailCount += 1;
+    }
+
     parsed.push({
       name,
       company: headerIndex.company >= 0 ? row[headerIndex.company]?.trim() || undefined : undefined,
-      email: headerIndex.email >= 0 ? row[headerIndex.email]?.trim() || undefined : undefined,
+      email: normalizedEmail.value,
       phone: headerIndex.phone >= 0 ? row[headerIndex.phone]?.trim() || undefined : undefined,
       contactedAt: contactedAtRaw ? parseContactDate(contactedAtRaw) : undefined,
       contactMethod: headerIndex.contactMethod >= 0 ? row[headerIndex.contactMethod]?.trim() || undefined : undefined,
@@ -243,7 +274,7 @@ function parseRowsFromMatrix(matrix: unknown[][]): ContactImportRow[] {
     });
   }
 
-  return parsed;
+  return { rows: parsed, invalidEmailCount };
 }
 
 export default function AppPage() {
@@ -277,6 +308,7 @@ export default function AppPage() {
   const [eventDateTime, setEventDateTime] = React.useState("");
   const [importText, setImportText] = React.useState("");
   const [importRowsFromFile, setImportRowsFromFile] = React.useState<ContactImportRow[]>([]);
+  const [importInvalidEmailCount, setImportInvalidEmailCount] = React.useState(0);
   const [importInfo, setImportInfo] = React.useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = React.useState("");
   const [newEmail, setNewEmail] = React.useState("");
@@ -532,32 +564,46 @@ export default function AppPage() {
           raw: false,
           blankrows: false
         }) as unknown[][];
-        const parsedRows = parseRowsFromMatrix(sheetRows);
+        const parsed = parseRowsFromMatrix(sheetRows);
+        const parsedRows = parsed.rows;
 
         if (!parsedRows.length) {
           setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
           setImportRowsFromFile([]);
+          setImportInvalidEmailCount(0);
           return;
         }
 
         setImportRowsFromFile(parsedRows);
+        setImportInvalidEmailCount(parsed.invalidEmailCount);
         setImportText("");
-        setImportInfo(`Excel-bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`);
+        setImportInfo(
+          parsed.invalidEmailCount > 0
+            ? `Excel-bestand ${file.name} geladen met ${parsedRows.length} regels. ${parsed.invalidEmailCount} ongeldige e-mail(s) worden overgeslagen.`
+            : `Excel-bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`
+        );
         return;
       }
 
       const text = await file.text();
-      const parsedRows = parseImportRows(text);
+      const parsed = parseImportRows(text);
+      const parsedRows = parsed.rows;
       setImportText(text);
       setImportRowsFromFile(parsedRows);
+      setImportInvalidEmailCount(parsed.invalidEmailCount);
       if (parsedRows.length) {
-        setImportInfo(`Bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`);
+        setImportInfo(
+          parsed.invalidEmailCount > 0
+            ? `Bestand ${file.name} geladen met ${parsedRows.length} regels. ${parsed.invalidEmailCount} ongeldige e-mail(s) worden overgeslagen.`
+            : `Bestand ${file.name} geladen met ${parsedRows.length} geldige regels.`
+        );
       } else {
         setImportInfo(`Bestand ${file.name} geladen. Controleer de data en klik op importeren.`);
       }
     } catch (err) {
       setError((err as Error).message);
       setImportRowsFromFile([]);
+      setImportInvalidEmailCount(0);
     }
   };
 
@@ -566,8 +612,9 @@ export default function AppPage() {
     setError(null);
     setImportInfo(null);
 
-    const typedRows = importText.trim() ? parseImportRows(importText) : [];
-    const rows = typedRows.length ? typedRows : importRowsFromFile;
+    const typedParsed = importText.trim() ? parseImportRows(importText) : { rows: [], invalidEmailCount: 0 };
+    const rows = typedParsed.rows.length ? typedParsed.rows : importRowsFromFile;
+    const invalidEmailCount = typedParsed.rows.length ? typedParsed.invalidEmailCount : importInvalidEmailCount;
 
     if (!rows.length) {
       setError("Import mislukt: geen geldige rijen of kolom Name/Naam gevonden");
@@ -586,11 +633,13 @@ export default function AppPage() {
         body: JSON.stringify({ rows })
       });
 
+      const skippedInfo = invalidEmailCount > 0 ? ` ${invalidEmailCount} ongeldige e-mail(s) overgeslagen.` : "";
       setImportInfo(
-        `${result.importedRows} regels verwerkt: ${result.createdCustomers} nieuwe klanten, ${result.updatedCustomers} bijgewerkt, ${result.createdEvents} contactmomenten toegevoegd.`
+        `${result.importedRows} regels verwerkt: ${result.createdCustomers} nieuwe klanten, ${result.updatedCustomers} bijgewerkt, ${result.createdEvents} contactmomenten toegevoegd.${skippedInfo}`
       );
       setImportText("");
       setImportRowsFromFile([]);
+      setImportInvalidEmailCount(0);
       await loadContactsOverview();
     } catch (err) {
       setError((err as Error).message);
